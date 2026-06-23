@@ -1,0 +1,34 @@
+{
+  "name": "worker",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "process:campaigns": "tsx src/processQueuedCampaigns.ts",
+    "dev": "tsx src/campaignWorker.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/campaignWorker.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^20.19.39",
+    "prisma": "^7.7.0",
+    "tsx": "^4.22.2",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ses": "^3.1049.0",
+    "@direconnect/db": "*",
+    "bullmq": "^5.76.10",
+    "dotenv": "^16.6.1",
+    "ioredis": "^5.10.1",
+    "lodash.defaults": "^4.2.0",
+    "lodash.isarguments": "^3.1.0",
+    "lodash.isobject": "^3.0.2",
+    "msgpackr": "^2.0.2",
+    "node-abort-controller": "^3.1.1"
+  }
+}
