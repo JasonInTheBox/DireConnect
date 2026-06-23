@@ -1,0 +1,48 @@
+{
+  "name": "direconnect",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "version": "1.0.0",
+  "description": "This is the repository for Junjie Liu's DireConnect personal project.",
+  "main": "index.js",
+  "scripts": {
+    "dev:web": "npm run dev -w apps/web",
+    "dev:api": "npm run dev -w apps/api",
+    "dev:worker": "npm run dev -w apps/worker",
+    "process:campaigns": "npm run process:campaigns -w apps/worker",
+    "db:generate": "npm run generate -w packages/db",
+    "db:push": "npm run db:push -w packages/db",
+    "build:packages": "npm run build -w packages/db && npm run build -w packages/validation",
+    "build:apps": "npm run build -w apps/api && npm run build -w apps/worker && npm run build -w apps/web",
+    "build": "npm run db:generate && npm run build:packages && npm run build:apps",
+    "start:web": "npm run start -w apps/web",
+    "start:api": "npm run start -w apps/api",
+    "start:worker": "npm run start -w apps/worker"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JasonInTheBox/DireConnect.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/JasonInTheBox/DireConnect/issues"
+  },
+  "homepage": "https://github.com/JasonInTheBox/DireConnect#readme",
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^26.0.0",
+    "eslint": "^9.39.4",
+    "jest": "^30.3.0",
+    "playwright": "^1.59.1",
+    "prettier": "^3.8.3",
+    "ts-jest": "^29.4.9",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
+  }
+}

@@ -1,0 +1,159 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+model Customer {
+  id         String   @id @default(uuid())
+  ownerId    String
+  businessId String
+
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  firstName  String
+  lastName   String?
+  email      String?
+  phone      String?
+
+  emailOptIn Boolean  @default(true)
+  smsOptIn   Boolean  @default(false)
+  unsubscribedAt  DateTime?
+  unsubscribeToken  String? @unique
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([businessId])
+  @@unique([id, ownerId])
+}
+
+model Business {
+  id          String   @id @default(uuid())
+  ownerId     String
+  name        String
+  description String?
+  email       String?
+  phone       String?
+  website     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  customers   Customer[]
+  campaigns   Campaign[]
+
+  @@index([ownerId])
+  @@unique([id, ownerId])
+}
+
+model Campaign {
+  id          String   @id @default(uuid())
+  ownerId     String
+  businessId  String
+
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  title       String
+  message     String
+  channel     CampaignChannel
+  status      CampaignStatus @default(DRAFT)
+  sendAt      DateTime?
+  targetAudience  CampaignAudience  @default(ALL)
+
+  messageLogs MessageLog[]
+  recipientSnapshots CampaignRecipientSnapshot[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([ownerId])
+  @@index([businessId])
+}
+
+enum CampaignChannel {
+  EMAIL
+  SMS
+}
+
+enum CampaignStatus {
+  DRAFT
+  QUEUED
+  SENT
+  FAILED
+}
+
+enum CampaignAudience {
+  ALL
+  EMAIL_OPTED_IN
+  SMS_OPTED_IN  
+}
+
+model CampaignRecipientSnapshot {
+  id          String   @id @default(uuid())
+  ownerId     String
+  businessId  String
+  campaignId  String
+  customerId  String
+
+  channel        CampaignChannel
+  targetAudience CampaignAudience
+
+  recipient   String?
+  eligible    Boolean
+  reason      String?
+
+  emailOptInAtQueue Boolean
+  smsOptInAtQueue   Boolean
+  unsubscribedAtAtQueue DateTime?
+  unsubscribeTokenAtQueue String?
+
+  createdAt   DateTime @default(now())
+
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, customerId])
+  @@index([ownerId])
+  @@index([businessId])
+  @@index([campaignId])
+  @@index([customerId])
+}
+
+
+model MessageLog {
+  id            String  @id @default(uuid())
+  ownerId       String
+  businessId    String
+  campaignId    String
+  customerId    String
+
+  channel       CampaignChannel
+  recipient     String
+  status        MessageStatus @default(PENDING)
+  errorMessage  String?
+
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  campaign      Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@index([businessId])
+  @@index([campaignId])
+  @@index([customerId])
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  FAILED
+}
