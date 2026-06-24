@@ -537,3 +537,52 @@ Frontend hosting domain is not finalized.
 CORS must be updated with the final frontend URL.
 APP_URL must be updated with the final API URL.
 ```
+
+## Current Deployed URLs
+
+Frontend:
+https://main.d8j6rr4pntmji.amplifyapp.com
+
+Public API:
+https://d9auoa5p89nsz.cloudfront.net
+
+API Health Check:
+https://d9auoa5p89nsz.cloudfront.net/health
+
+Internal API Origin:
+http://direconnect-api-alb-864655864.us-west-1.elb.amazonaws.com
+
+## Current Deployment Architecture
+
+DireConnect is deployed with:
+
+- Frontend: AWS Amplify
+- API: AWS ECS Fargate
+- Worker: AWS ECS Fargate
+- API HTTPS wrapper: AWS CloudFront
+- API routing origin: Application Load Balancer
+- Database/Auth: Supabase
+- Queue: Managed Redis
+- Background jobs: BullMQ worker
+- Current message mode: fake/demo mode
+
+## Important Environment Variables
+
+Frontend Amplify:
+- NEXT_PUBLIC_API_URL=https://d9auoa5p89nsz.cloudfront.net
+- NEXT_PUBLIC_SUPABASE_URL=<Supabase project URL>
+- NEXT_PUBLIC_SUPABASE_ANON_KEY=<Supabase publishable/anon key>
+
+API ECS:
+- CLIENT_URL=https://main.d8j6rr4pntmji.amplifyapp.com
+- DATABASE_URL=<Supabase database URL>
+- REDIS_URL=<Managed Redis URL>
+- SUPABASE_URL=<Supabase project URL>
+- SUPABASE_JWT_SECRET=<Supabase JWT secret>
+- PORT=4000
+
+Worker ECS:
+- DATABASE_URL=<Supabase database URL>
+- REDIS_URL=<Managed Redis URL>
+- APP_URL=https://d9auoa5p89nsz.cloudfront.net
+- MESSAGE_MODE=fake
