@@ -258,3 +258,13 @@ REDIS_URL=redis://localhost:6379
 
 Docker Compose automatically creates a shared network where the `api`, `worker`, and `redis` services can communicate by service name.
 
+
+## Live Demo
+
+Frontend:
+https://main.d8j6rr4pntmji.amplifyapp.com
+
+API Health Check:
+https://d9auoa5p89nsz.cloudfront.net/health
+
+Note: The deployed app currently runs in demo/fake message mode. Campaign jobs are queued and processed by the background worker, but real emails are not sent yet.
