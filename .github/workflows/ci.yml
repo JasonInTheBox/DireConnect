@@ -12,15 +12,15 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
-      SUPABASE_URL: https://example.supabase.co
-      SUPABASE_JWT_SECRET: fake-jwt-secret
+      DATABASE_URL: postgresql://postgres.xfpyscsjqxiqwxdgreth:Iloveeula2005%40@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true
+      SUPABASE_URL: https://xfpyscsjqxiqwxdgreth.supabase.co
+      SUPABASE_JWT_SECRET: OSvq/aJ4uh24VOi1Vze0S78ZEVjhytrYR9Qh+rBbFvDdsIsEQF3HLC1t0vumKq7KT4TRm4HTcQ/He8J92kIh2A==
       REDIS_URL: redis://localhost:6379
       CLIENT_URL: http://localhost:3000
-      NEXT_PUBLIC_API_URL: http://localhost:4000
-      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: fake-anon-key
-      MESSAGE_MODE: fake
+      NEXT_PUBLIC_API_URL: https://d9auoa5p89nsz.cloudfront.net
+      NEXT_PUBLIC_SUPABASE_URL: https://xfpyscsjqxiqwxdgreth.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmcHlzY3NqcXhpcXd4ZGdyZXRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3OTk0NjUsImV4cCI6MjA5MjM3NTQ2NX0.GOrmD5Z3H25EDHzbNnPStAeLHEdfeb08AyphFFiEGH4
+      MESSAGE_MODE: aws
       APP_URL: http://localhost:4000
       AWS_REGION: us-west-1
 
