@@ -49,5 +49,12 @@ jobs:
       - name: Build worker
         run: npm run build -w apps/worker
 
+      - name: Prepare frontend env
+        run: |
+          echo "NEXT_PUBLIC_API_URL=http://localhost:4000" >> apps/web/.env.production
+          echo "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co" >> apps/web/.env.production
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=fake-anon-key" >> apps/web/.env.production
+          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=fake-publishable-key" >> apps/web/.env.production
+
       - name: Build frontend
         run: npm run build -w apps/web
