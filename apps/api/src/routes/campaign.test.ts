@@ -21,7 +21,7 @@ const mocks = {
 };
 
 function createTestApp() {
-  const fakeRequireAuth = (req: any, _res: any, next: any) => {
+  const fakeRequireAuth = async (req: any, _res: any, next: any) => {
     req.user = {
       id: "user-1",
       email: "jason@example.com",
