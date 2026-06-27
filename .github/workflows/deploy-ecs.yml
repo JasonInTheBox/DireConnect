@@ -1,0 +1,139 @@
+name: DireConnect Manual ECS Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_api:
+        description: "Deploy API service"
+        required: true
+        default: true
+        type: boolean
+      deploy_worker:
+        description: "Deploy worker service"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Build, push, and deploy to ECS
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tag
+        id: image-tag
+        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push API image
+        if: ${{ inputs.deploy_api }}
+        id: build-api
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ vars.ECR_API_REPOSITORY }}
+          IMAGE_TAG: ${{ steps.image-tag.outputs.tag }}
+        run: |
+          docker build -f apps/api/Dockerfile -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Download API task definition
+        if: ${{ inputs.deploy_api }}
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ vars.ECS_API_TASK_DEFINITION }} \
+            --query taskDefinition \
+            > api-task-definition.json
+
+          jq 'del(
+            .taskDefinitionArn,
+            .revision,
+            .status,
+            .requiresAttributes,
+            .compatibilities,
+            .registeredAt,
+            .registeredBy
+          )' api-task-definition.json > api-task-definition-clean.json
+
+      - name: Render API task definition
+        if: ${{ inputs.deploy_api }}
+        id: render-api
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: api-task-definition-clean.json
+          container-name: ${{ vars.API_CONTAINER_NAME }}
+          image: ${{ steps.build-api.outputs.image }}
+
+      - name: Deploy API task definition
+        if: ${{ inputs.deploy_api }}
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-api.outputs.task-definition }}
+          service: ${{ vars.ECS_API_SERVICE }}
+          cluster: ${{ vars.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      - name: Build and push worker image
+        if: ${{ inputs.deploy_worker }}
+        id: build-worker
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ vars.ECR_WORKER_REPOSITORY }}
+          IMAGE_TAG: ${{ steps.image-tag.outputs.tag }}
+        run: |
+          docker build -f apps/worker/Dockerfile -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Download worker task definition
+        if: ${{ inputs.deploy_worker }}
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ vars.ECS_WORKER_TASK_DEFINITION }} \
+            --query taskDefinition \
+            > worker-task-definition.json
+
+          jq 'del(
+            .taskDefinitionArn,
+            .revision,
+            .status,
+            .requiresAttributes,
+            .compatibilities,
+            .registeredAt,
+            .registeredBy
+          )' worker-task-definition.json > worker-task-definition-clean.json
+
+      - name: Render worker task definition
+        if: ${{ inputs.deploy_worker }}
+        id: render-worker
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: worker-task-definition-clean.json
+          container-name: ${{ vars.WORKER_CONTAINER_NAME }}
+          image: ${{ steps.build-worker.outputs.image }}
+
+      - name: Deploy worker task definition
+        if: ${{ inputs.deploy_worker }}
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-worker.outputs.task-definition }}
+          service: ${{ vars.ECS_WORKER_SERVICE }}
+          cluster: ${{ vars.ECS_CLUSTER }}
+          wait-for-service-stability: true
