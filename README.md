@@ -127,6 +127,14 @@ The application was deployed using AWS services:
 * Database/Auth: Supabase
 * Queue: Redis/BullMQ
 
+## Deployment Runbook
+
+```
+Deployment, scaling, health checks, and troubleshooting steps are documented in:
+
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+```
+
 ## Local Development
 
 Install dependencies:
