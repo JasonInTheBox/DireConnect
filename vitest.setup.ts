@@ -11,7 +11,7 @@ process.env.SUPABASE_PUBLISHABLE_KEY ??= "fake-jwt-secret";
 
 process.env.REDIS_URL ??= "redis://localhost:6379";
 
-process.env.MESSAGE_MODE ??= "fake";
+process.env.MESSAGE_MODE = "fake";
 process.env.APP_URL ??= "http://localhost:4000";
 process.env.AWS_REGION ??= "us-west-1";
 

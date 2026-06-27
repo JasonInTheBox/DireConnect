@@ -36,10 +36,10 @@ const baseWorkerEnv = {
 const awsWorkerEnv =
   messageMode === "aws"
     ? {
-        awsRegion: getRequiredEnv("AWS_REGION"),
-        sesFromEmail: getRequiredEnv("SES_FROM_EMAIL"),
-        awsAccessKeyId: getRequiredEnv("AWS_ACCESS_KEY_ID"),
-        awsSecretAccessKey: getRequiredEnv("AWS_SECRET_ACCESS_KEY"),
+        awsRegion: process.env.AWS_REGION,
+        sesFromEmail: process.env.SES_FROM_EMAIL,
+        awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
       }
     : {
         awsRegion: process.env.AWS_REGION,
