@@ -1,0 +1,73 @@
+name: DireConnect Scale ECS Services
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Start or stop ECS services"
+        required: true
+        default: "start"
+        type: choice
+        options:
+          - start
+          - stop
+      scale_api:
+        description: "Scale API service"
+        required: true
+        default: true
+        type: boolean
+      scale_worker:
+        description: "Scale worker service"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  scale:
+    name: Scale ECS services
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Set desired count
+        id: desired-count
+        run: |
+          if [ "${{ inputs.action }}" = "start" ]; then
+            echo "count=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "count=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Scale API service
+        if: ${{ inputs.scale_api }}
+        run: |
+          aws ecs update-service \
+            --cluster ${{ vars.ECS_CLUSTER }} \
+            --service ${{ vars.ECS_API_SERVICE }} \
+            --desired-count ${{ steps.desired-count.outputs.count }}
+
+      - name: Scale worker service
+        if: ${{ inputs.scale_worker }}
+        run: |
+          aws ecs update-service \
+            --cluster ${{ vars.ECS_CLUSTER }} \
+            --service ${{ vars.ECS_WORKER_SERVICE }} \
+            --desired-count ${{ steps.desired-count.outputs.count }}
+
+      - name: Show service status
+        run: |
+          aws ecs describe-services \
+            --cluster ${{ vars.ECS_CLUSTER }} \
+            --services ${{ vars.ECS_API_SERVICE }} ${{ vars.ECS_WORKER_SERVICE }} \
+            --query "services[*].{name:serviceName,desired:desiredCount,running:runningCount,pending:pendingCount}" \
+            --output table
