@@ -26,6 +26,7 @@
   "dependencies": {
     "@direconnect/db": "*",
     "@direconnect/validation": "*",
+    "@sentry/node": "^10.62.0",
     "@supabase/supabase-js": "^2.108.2",
     "bullmq": "^5.76.10",
     "cors": "^2.8.6",

@@ -5,6 +5,9 @@ import { prisma } from "@direconnect/db";
 import { workerEnv } from "./config/env.js";
 import { sendMessage } from "./services/messageSender.js";
 import { buildCampaignEmailHtml } from "./services/emailTemplate.js";
+import { initSentry, Sentry } from "./lib/sentry.js";
+
+initSentry();
 
 export type SendCampaignJobData = {
   campaignId: string;
@@ -198,7 +201,12 @@ export function startCampaignWorker() {
     "campaign-send",
     async (job) => {
       console.log(`Received job ${job.id}: ${job.name}`);
-      await processCampaignJob(job.data);
+      try {
+        await processCampaignJob(job.data);
+      } catch (error) {
+        Sentry.captureException(error);
+        throw error;
+      }
     },
     {
       connection,
@@ -212,6 +220,17 @@ export function startCampaignWorker() {
 
   worker.on("failed", (job, error) => {
     console.error(`Job failed: ${job?.id}`, error);
+
+    Sentry.captureException(error, {
+      tags: {
+        worker: "campaign-send",
+        jobName: job?.name ?? "unknown",
+      },
+      extra: {
+        jobId: job?.id,
+        jobData: job?.data,
+      },
+    });
   });
 
   console.log("Campaign worker is running and waiting for jobs...");

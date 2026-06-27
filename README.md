@@ -2,6 +2,15 @@
 
 DireConnect is a full-stack customer and campaign management application built to practice production-style software engineering. The app lets authenticated users create businesses, manage customers, create email or SMS campaigns, preview eligible recipients, queue campaigns, process campaign jobs in a background worker, and view campaign logs and analytics.
 
+
+## Live Demo
+
+Frontend: https://main.d8j6rr4pntmji.amplifyapp.com  
+API Health Check: https://d9auoa5p89nsz.cloudfront.net/health
+
+Note: The deployed API/worker may be scaled down outside of demo periods to control AWS costs.
+
+
 ## Tech Stack
 
 ### Frontend
@@ -55,6 +64,34 @@ DireConnect is a full-stack customer and campaign management application built t
 The frontend is deployed through AWS Amplify and communicates with the backend API over HTTPS through CloudFront. CloudFront forwards API requests to an Application Load Balancer, which routes traffic to the Express API running on ECS Fargate.
 
 The API handles authentication, business/customer/campaign routes, validation, and campaign queueing. Campaign jobs are pushed into Redis through BullMQ. A separate ECS Fargate worker consumes queued jobs, checks recipient snapshots, sends messages in fake or real mode, and writes message logs back to the database.
+
+
+## Architecture
+
+```text
+User Browser
+    |
+    v
+AWS Amplify Frontend
+    |
+    v
+CloudFront HTTPS API URL
+    |
+    v
+Application Load Balancer
+    |
+    v
+ECS Fargate API Container
+    |
+    +--> Supabase PostgreSQL
+    |
+    +--> Redis / BullMQ Queue
+              |
+              v
+        ECS Fargate Worker
+              |
+              v
+        Message Logs / Campaign Analytics
 
 ## Testing
 

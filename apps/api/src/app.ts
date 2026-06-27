@@ -4,6 +4,9 @@ import { customerRouter } from "./routes/customer.js";
 import { businessRouter } from "./routes/business.js";
 import { campaignRouter } from "./routes/campaign.js";
 import { unsubscribeRouter } from "./routes/unsubscribe.js";
+import { initSentry, Sentry } from "./lib/sentry.js";
+
+initSentry();
 
 const app = express();
 
@@ -43,5 +46,23 @@ app.use("/api/businesses", businessRouter);
 app.use("/api/businesses/:businessId/customers", customerRouter);
 app.use("/api/businesses/:businessId/campaigns", campaignRouter);
 app.use("/api/unsubscribe", unsubscribeRouter)
+
+Sentry.setupExpressErrorHandler(app);
+
+app.use(
+  (
+    err: unknown,
+    _req: express.Request,
+    res: express.Response,
+    _next: express.NextFunction,
+  ) => {
+    console.error(err);
+
+    res.status(500).json({
+      error: "Internal server error",
+    });
+  },
+);
+
 
 export { app };
