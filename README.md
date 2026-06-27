@@ -1,3 +1,9 @@
+# DireConnect
+
+![CI](https://github.com/JasonInTheBox/DireConnect/actions/workflows/ci.yml/badge.svg)
+![Docker Build](https://github.com/JasonInTheBox/DireConnect/actions/workflows/docker-build.yml/badge.svg)
+![E2E](https://github.com/JasonInTheBox/DireConnect/actions/workflows/e2e.yml/badge.svg)
+
 ## DireConnect
 
 DireConnect is a full-stack customer and campaign management application built to practice production-style software engineering. The app lets authenticated users create businesses, manage customers, create email or SMS campaigns, preview eligible recipients, queue campaigns, process campaign jobs in a background worker, and view campaign logs and analytics.
