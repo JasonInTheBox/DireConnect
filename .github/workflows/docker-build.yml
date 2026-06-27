@@ -1,0 +1,40 @@
+name: DireConnect Docker Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  docker-build:
+    name: Build API and worker Docker images
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: false
+          tags: direconnect-api:ci
+          cache-from: type=gha,scope=direconnect-api
+          cache-to: type=gha,mode=max,scope=direconnect-api
+
+      - name: Build worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/worker/Dockerfile
+          push: false
+          tags: direconnect-worker:ci
+          cache-from: type=gha,scope=direconnect-worker
+          cache-to: type=gha,mode=max,scope=direconnect-worker
