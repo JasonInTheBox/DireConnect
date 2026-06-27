@@ -20,7 +20,9 @@
     "build": "npm run db:generate && npm run build:packages && npm run build:apps",
     "start:web": "npm run start -w apps/web",
     "start:api": "npm run start -w apps/api",
-    "start:worker": "npm run start -w apps/worker"
+    "start:worker": "npm run start -w apps/worker",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "repository": {
     "type": "git",
@@ -43,6 +45,6 @@
     "prettier": "^3.8.3",
     "ts-jest": "^29.4.9",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.9"
   }
 }
