@@ -1,270 +1,142 @@
-# DireConnect
-This is the repository for Junjie Liu's DireConnect personal project.
+## DireConnect
 
-## What is DireConnect
-DireConnect is a tool for small businesses that attracts new customers and turns them into clients. DireConnect introduces a business-controlled loyalty-program platform that enables businesses to customize deals, rewards, and promotion. They can easily manage client data and send out advertisements through SMS and email. On the consumer side, they can invite friends to earn bonus points, creating a long chain of clients
-
-## Why DireConnect?
-Often, small businesses fall behind in the competitive advertisement environment and suffer slow growth. They do not have a way to compete with larger businesses who would spend way more on online ads nor a systematic way to connect with their clients and attract new customers.
+DireConnect is a full-stack customer and campaign management application built to practice production-style software engineering. The app lets authenticated users create businesses, manage customers, create email or SMS campaigns, preview eligible recipients, queue campaigns, process campaign jobs in a background worker, and view campaign logs and analytics.
 
 ## Tech Stack
-- **Frontend**: Next.js + React + TypeScript
-- **Backend**: Express
-- **DB**: Supabase Postgres
-- **Auth**: Supabase Auth
-- **ORM**: Prisma
-- **Validation**: Zod
-- **SMS/Email**: Amazon SNS + Amazon SES
-- **Background jobs**: BullMQ + Redis
-- **Storage**: Supabase Storage
-- **Hosting**: AWS Amplify for frontend, AWS ECS/Fargate for API/worker
-- **Monitoring**: Sentry
-- **Testing**: Vitest/Jest + Playwright
-- **CI/CD**: GitHub Actions
 
+### Frontend
 
-## Running the Backend with Docker
+* Next.js
+* React
+* TypeScript
+* Tailwind CSS
+* Supabase Auth
 
-DireConnect can run its backend services with Docker Compose. This starts the Redis job queue, Express API, and BullMQ worker together.
+### Backend
 
-The frontend is still run locally with Next.js during development.
+* Node.js
+* Express
+* TypeScript
+* Prisma
+* Zod
+* Supabase PostgreSQL
 
-### Services Started by Docker Compose
+### Background Jobs
 
-```text
-redis    → Redis job queue used by BullMQ
-api      → Express API running on http://localhost:4000
-worker   → BullMQ worker that processes campaign jobs
+* BullMQ
+* Redis
+* Worker service for campaign processing
+
+### Cloud / Deployment
+
+* AWS Amplify for frontend hosting
+* Amazon ECR for Docker image storage
+* Amazon ECS Fargate for API and worker containers
+* Application Load Balancer for API traffic
+* CloudFront for HTTPS API access
+* CloudWatch for logs
+* GitHub Actions for CI checks
+
+## Core Features
+
+* User authentication with Supabase Auth
+* Business creation and ownership-based access control
+* Customer CRUD operations
+* Email and SMS opt-in tracking
+* Campaign creation and editing
+* Campaign audience preview
+* Campaign queueing with recipient snapshots
+* Background worker processing through BullMQ
+* Message logs and campaign analytics
+* Unsubscribe support through customer tokens
+
+## Architecture Overview
+
+The frontend is deployed through AWS Amplify and communicates with the backend API over HTTPS through CloudFront. CloudFront forwards API requests to an Application Load Balancer, which routes traffic to the Express API running on ECS Fargate.
+
+The API handles authentication, business/customer/campaign routes, validation, and campaign queueing. Campaign jobs are pushed into Redis through BullMQ. A separate ECS Fargate worker consumes queued jobs, checks recipient snapshots, sends messages in fake or real mode, and writes message logs back to the database.
+
+## Testing
+
+This project includes several layers of automated testing:
+
+* Zod schema validation tests
+* Express validation middleware tests
+* API route tests for business, customer, and campaign routes
+* Campaign eligibility unit tests
+* Worker tests for campaign job processing
+* Playwright frontend smoke tests
+* GitHub Actions CI for automated build and test checks
+
+## Deployment
+
+The application was deployed using AWS services:
+
+* Frontend: AWS Amplify
+* API: ECS Fargate behind an Application Load Balancer
+* API HTTPS layer: CloudFront
+* Worker: ECS Fargate background service
+* Docker images: Amazon ECR
+* Logs: CloudWatch
+* Database/Auth: Supabase
+* Queue: Redis/BullMQ
+
+## Local Development
+
+Install dependencies:
+
+```bash
+npm install
 ```
 
-### Required Environment Files
+Generate Prisma client:
 
-Before starting Docker Compose, create the following real environment files:
-
-```text
-apps/api/.env
-apps/worker/.env
+```bash
+npm run db:generate
 ```
 
-These files are not committed to Git because they contain secrets.
+Build shared packages:
 
-Use the `.env.example` files as references:
-
-```text
-apps/api/.env.example
-apps/worker/.env.example
+```bash
+npm run build:packages
 ```
 
-When using Docker `env_file`, write environment values without quotes.
+Run the frontend:
 
-Use this style:
-
-```env
-SUPABASE_URL=https://your-project.supabase.co
-CLIENT_URL=http://localhost:3000
-PORT=4000
-```
-
-Avoid this style:
-
-```env
-SUPABASE_URL="https://your-project.supabase.co"
-CLIENT_URL="http://localhost:3000"
-PORT="4000"
-```
-
-### API Environment Variables
-
-The API needs:
-
-```env
-DATABASE_URL=your-supabase-database-url
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_JWT_SECRET=your-supabase-jwt-secret
-REDIS_URL=redis://localhost:6379
-CLIENT_URL=http://localhost:3000
-PORT=4000
-```
-
-When running through Docker Compose, `REDIS_URL` is overridden to:
-
-```env
-REDIS_URL=redis://redis:6379
-```
-
-This is because Docker containers communicate with each other by service name. In `docker-compose.yml`, the Redis service is named `redis`.
-
-### Worker Environment Variables
-
-The worker needs:
-
-```env
-DATABASE_URL=your-supabase-database-url
-REDIS_URL=redis://localhost:6379
-
-MESSAGE_MODE=fake
-APP_URL=http://localhost:4000
-```
-
-For real Amazon SES email sending, use:
-
-```env
-MESSAGE_MODE=aws
-AWS_REGION=your-aws-region
-SES_FROM_EMAIL=your-verified-ses-email
-AWS_ACCESS_KEY_ID=your-aws-access-key-id
-AWS_SECRET_ACCESS_KEY=your-aws-secret-access-key
-```
-
-When running through Docker Compose, `REDIS_URL` is overridden to:
-
-```env
-REDIS_URL=redis://redis:6379
-```
-
-### Start Backend Services
-
-From the project root:
-
-```powershell
-docker compose up --build
-```
-
-This builds and starts:
-
-```text
-Redis
-Express API
-BullMQ worker
-```
-
-The API will be available at:
-
-```text
-http://localhost:4000
-```
-
-### Test the API
-
-Open this URL in the browser:
-
-```text
-http://localhost:4000/health
-```
-
-Expected response:
-
-```json
-{
-  "status": "ok",
-  "service": "direconnect-api",
-  "timestamp": "..."
-}
-```
-
-### Run the Frontend
-
-In a separate terminal, run:
-
-```powershell
+```bash
 npm run dev:web
 ```
 
-Then open:
+Run the API:
 
-```text
-http://localhost:3000
+```bash
+npm run dev:api
 ```
 
-The local development setup is now:
+Run the worker:
 
-```text
-Frontend       → local Next.js dev server
-API            → Docker container
-Worker         → Docker container
-Redis          → Docker container
-Database/Auth  → Supabase
+```bash
+npm run dev:worker
 ```
 
-### Stop Docker Services
+Run tests:
 
-```powershell
-docker compose down
+```bash
+npm test
 ```
 
-### Rebuild Docker Services
+Run frontend E2E tests:
 
-Use this after changing Dockerfiles, package dependencies, or backend source code:
-
-```powershell
-docker compose up --build
+```bash
+npm run test:e2e
 ```
 
-### Run Docker in the Background
+Run full build:
 
-```powershell
-docker compose up --build -d
+```bash
+npm run build
 ```
 
-### View Logs
+## What I Learned
 
-View logs for all services:
-
-```powershell
-docker compose logs -f
-```
-
-View only API logs:
-
-```powershell
-docker compose logs -f api
-```
-
-View only worker logs:
-
-```powershell
-docker compose logs -f worker
-```
-
-### Remove Old Containers
-
-If Docker reports a container name conflict, run:
-
-```powershell
-docker compose down
-```
-
-For manually created containers, remove them with:
-
-```powershell
-docker rm -f direconnect-api
-docker rm -f direconnect-worker
-docker rm -f direconnect-redis
-```
-
-### Notes
-
-Inside Docker, `localhost` refers to the current container, not the host computer. That is why the API and worker use:
-
-```env
-REDIS_URL=redis://redis:6379
-```
-
-instead of:
-
-```env
-REDIS_URL=redis://localhost:6379
-```
-
-Docker Compose automatically creates a shared network where the `api`, `worker`, and `redis` services can communicate by service name.
-
-
-## Live Demo
-
-Frontend:
-https://main.d8j6rr4pntmji.amplifyapp.com
-
-API Health Check:
-https://d9auoa5p89nsz.cloudfront.net/health
-
-Note: The deployed app currently runs in demo/fake message mode. Campaign jobs are queued and processed by the background worker, but real emails are not sent yet.
+Through this project, I practiced full-stack development, authentication, database modeling, API design, background job processing, cloud deployment, Docker, AWS ECS/Fargate, CloudFront, CI/CD, automated testing, and production-style debugging.
