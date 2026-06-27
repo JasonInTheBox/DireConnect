@@ -93,6 +93,15 @@ ECS Fargate API Container
               v
         Message Logs / Campaign Analytics
 
+## Monitoring
+
+This project uses Sentry for error monitoring across the frontend, API, and background worker.
+
+- Frontend errors are captured from the Next.js app.
+- API errors are captured from the Express server.
+- Worker errors are captured from the BullMQ campaign processing worker.
+- Production logs are also available through AWS CloudWatch.
+
 ## Testing
 
 This project includes several layers of automated testing:
