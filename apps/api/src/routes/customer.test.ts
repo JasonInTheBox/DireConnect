@@ -13,7 +13,7 @@ const mocks = {
 };
 
 function createTestApp() {
-  const fakeRequireAuth = (req: any, _res: any, next: any) => {
+  const fakeRequireAuth = async (req: any, _res: any, next: any) => {
     req.user = {
       id: "user-1",
       email: "jason@example.com",
@@ -30,8 +30,8 @@ function createTestApp() {
       findMany: mocks.customerFindMany,
       create: mocks.customerCreate,
       updateMany: mocks.customerUpdateMany,
-    findFirst: mocks.customerFindFirst,
-    deleteMany: mocks.customerDeleteMany,
+      findFirst: mocks.customerFindFirst,
+      deleteMany: mocks.customerDeleteMany,
     },
   };
 
