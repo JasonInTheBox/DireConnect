@@ -191,6 +191,25 @@ Run full build:
 npm run build
 ```
 
+## Environment Variables
+
+This project uses separate environment variables for the frontend, API, worker, database, queue, monitoring, and deployment.
+
+Example files are provided:
+
+- `.env.example`
+- `apps/web/.env.example`
+- `apps/api/.env.example`
+- `apps/worker/.env.example`
+
+Copy the relevant example file and fill in local values:
+
+```bash
+cp .env.example .env
+cp apps/web/.env.example apps/web/.env.local
+cp apps/api/.env.example apps/api/.env
+cp apps/worker/.env.example apps/worker/.env
+
 ## What I Learned
 
 Through this project, I practiced full-stack development, authentication, database modeling, API design, background job processing, cloud deployment, Docker, AWS ECS/Fargate, CloudFront, CI/CD, automated testing, and production-style debugging.
