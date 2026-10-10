@@ -2,13 +2,16 @@ import { Router } from "express";
 import { campaignQueue } from "../lib/campaignQueue.js";
 import { prisma } from "@direconnect/db";
 import {
+  CAMPAIGN_EMAIL_SAFETY_LIMITS,
   createCampaignSchema,
+  isCampaignSenderApproved,
   updateCampaignSchema,
 } from "@direconnect/validation";
 import { validate } from "../middleware/validate.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { getCampaignEligibility } from "../lib/campaignEligibility.js";
 import type { AuthenticatedRequest } from "../middleware/requireAuth.js";
+import { apiEnv } from "../config/env.js";
 
 function getParam(value: unknown): string | null {
   return typeof value === "string" ? value : null;
@@ -530,6 +533,25 @@ export function createCampaignRouter(
         return res.status(400).json({ error: "Invalid campaign ID" });
       }
 
+      if (apiEnv.nodeEnv === "production") {
+        if (!req.user?.emailConfirmed) {
+          return res.status(403).json({
+            error: "Confirm your account email before sending campaigns.",
+          });
+        }
+
+        if (
+          !isCampaignSenderApproved(
+            req.user!.id,
+            apiEnv.campaignSenderAllowlist,
+          )
+        ) {
+          return res.status(403).json({
+            error: "Campaign sending is not enabled for this account.",
+          });
+        }
+      }
+
       const business = await verifyBusinessOwnership(businessId, req.user!.id);
 
       if (!business) {
@@ -557,6 +579,50 @@ export function createCampaignRouter(
         });
       }
 
+      const customers = await db.customer.findMany({
+        where: {
+          businessId,
+          ownerId: req.user!.id,
+        },
+      });
+
+      const snapshots = customers.map((customer) => {
+        const eligibility = getCampaignEligibility(draftCampaign, customer);
+
+        return {
+          ownerId: req.user!.id,
+          businessId,
+          campaignId,
+          customerId: customer.id,
+          channel: draftCampaign.channel,
+          targetAudience: draftCampaign.targetAudience,
+
+          recipient: eligibility.recipient,
+          eligible: eligibility.eligible,
+          reason: eligibility.reason,
+
+          emailOptInAtQueue: customer.emailOptIn,
+          smsOptInAtQueue: customer.smsOptIn,
+          unsubscribedAtAtQueue: customer.unsubscribedAt,
+          unsubscribeTokenAtQueue: customer.unsubscribeToken,
+        };
+      });
+
+      const eligibleCount = snapshots.filter((snapshot) => snapshot.eligible).length;
+      if (eligibleCount === 0) {
+        return res.status(409).json({
+          error: "This campaign has no eligible, opted-in email recipients.",
+        });
+      }
+
+      if (eligibleCount > CAMPAIGN_EMAIL_SAFETY_LIMITS.maxRecipientsPerCampaign) {
+        return res.status(409).json({
+          error: `Campaigns are limited to ${CAMPAIGN_EMAIL_SAFETY_LIMITS.maxRecipientsPerCampaign} recipients. Narrow the audience before sending.`,
+          eligibleCount,
+          maxRecipients: CAMPAIGN_EMAIL_SAFETY_LIMITS.maxRecipientsPerCampaign,
+        });
+      }
+
       const result = await db.campaign.updateMany({
         where: {
           id: campaignId,
@@ -576,47 +642,6 @@ export function createCampaignRouter(
         });
       }
 
-      const campaign = await db.campaign.findFirst({
-        where: {
-          id: campaignId,
-          businessId,
-          ownerId: req.user!.id,
-        },
-      });
-
-      if (!campaign) {
-        return res.status(404).json({ error: "Campaign not found" });
-      }
-
-      const customers = await db.customer.findMany({
-        where: {
-          businessId,
-          ownerId: req.user!.id,
-        },
-      });
-
-      const snapshots = customers.map((customer) => {
-        const eligibility = getCampaignEligibility(campaign, customer);
-
-        return {
-          ownerId: req.user!.id,
-          businessId,
-          campaignId,
-          customerId: customer.id,
-          channel: campaign.channel,
-          targetAudience: campaign.targetAudience,
-
-          recipient: eligibility.recipient,
-          eligible: eligibility.eligible,
-          reason: eligibility.reason,
-
-          emailOptInAtQueue: customer.emailOptIn,
-          smsOptInAtQueue: customer.smsOptIn,
-          unsubscribedAtAtQueue: customer.unsubscribedAt,
-          unsubscribeTokenAtQueue: customer.unsubscribeToken,
-        };
-      });
-
       await db.campaignRecipientSnapshot.deleteMany({
         where: {
           campaignId,
@@ -629,8 +654,8 @@ export function createCampaignRouter(
         data: snapshots,
       });
 
-      const delay = campaign.sendAt
-        ? Math.max(campaign.sendAt.getTime() - Date.now(), 0)
+      const delay = draftCampaign.sendAt
+        ? Math.max(draftCampaign.sendAt.getTime() - Date.now(), 0)
         : 0;
 
       await queue.add(
@@ -659,7 +684,7 @@ export function createCampaignRouter(
             : "Campaign queued successfully",
         campaignId,
         delay,
-        scheduledFor: campaign.sendAt,
+        scheduledFor: draftCampaign.sendAt,
       });
     },
   );

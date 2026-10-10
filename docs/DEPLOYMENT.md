@@ -1,12 +1,13 @@
 # Free-tier deployment guide
 
-This repo is configured for a Vercel frontend, a Render Free Express API, Supabase, Resend email, and a configurable BullMQ Redis connection. The worker remains independently runnable and is not deployed as an always-on free service.
+This repo is configured for a Vercel frontend, a Render Express API, a Railway BullMQ worker, Supabase, Resend email, and a configurable Redis connection.
 
 ## What is implemented
 
 - Next.js frontend, Express API, Prisma, Supabase Auth/PostgreSQL, BullMQ, ioredis, Sentry, Vitest, Playwright, and GitHub Actions are present.
 - API and worker use Redis through `REDIS_URL`; ioredis accepts `redis://` locally and `rediss://` for TLS endpoints.
 - The BullMQ worker sends one message per eligible campaign recipient through the Resend Node.js SDK. Development and CI default to a local simulation.
+- Production campaign sending requires a verified Supabase account, an explicit sender allowlist, and strict campaign, account, platform, and recipient limits.
 - SMS fields and historical campaigns remain in the database. New SMS campaigns, SMS campaign edits, and queueing SMS drafts are blocked in both the UI and API; the worker also fails any legacy SMS job without calling a provider.
 - Supabase Storage upload code and a SendGrid or Twilio integration were not found in the repository. No storage migration or subscriber import is required for this code change.
 - Prisma schema and migrations were not changed. No cloud database was reset or modified.
@@ -17,7 +18,7 @@ This repo is configured for a Vercel frontend, a Render Free Express API, Supaba
 Browser -> Vercel Next.js -> Render Express API -> Supabase Postgres/Auth
                                          |       -> Redis/BullMQ queue
                                          |
-                                         +-- local/demo worker -> Resend (only when enabled)
+                                         +-- Railway worker -> Resend (approved senders only)
 ```
 
 The API can run on Render Free and has `/health` for health checks. Render Free web services sleep after 15 minutes without inbound traffic and can take about a minute to wake. Render background workers are a different, continuously running service type and are not a free compute option. Run the worker locally for development or a controlled demo; queued or scheduled campaigns will wait while it is offline. Do not use keep-alive requests to simulate an always-on worker. [Render free service limits](https://render.com/docs/free) · [Render background workers](https://render.com/docs/background-workers)
@@ -28,7 +29,7 @@ Vercel Hobby currently costs $0, but its terms restrict use to personal, non-com
 
 1. Connect the GitHub repository to Render and create a Blueprint from `render.yaml`.
 2. Keep the API service on the `Free` plan. The blueprint builds the monorepo, generates Prisma Client, builds the shared packages and API, and uses `/health` as its health check.
-3. Set the prompted values in Render:
+3. Set the prompted values in Render. Keep `CAMPAIGN_SENDER_ALLOWLIST` empty until you have reviewed and approved the first campaign sender:
 
    | Variable | Value |
    | --- | --- |
@@ -37,6 +38,7 @@ Vercel Hobby currently costs $0, but its terms restrict use to personal, non-com
    | `SUPABASE_URL` | Supabase project URL |
    | `SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key used by the API's Supabase client |
    | `REDIS_URL` | The same BullMQ-compatible Redis URL used by the worker |
+   | `CAMPAIGN_SENDER_ALLOWLIST` | Comma-separated Supabase Auth user IDs approved to queue production campaigns |
    | `CLIENT_URL` | Comma-separated exact Vercel origins, without trailing slashes or paths |
    | `SENTRY_DSN` | Optional API Sentry DSN; leave unset to disable reporting |
 
@@ -72,7 +74,7 @@ Vercel Hobby is only suitable when the project remains personal and non-commerci
 - Keep `REDIS_URL` configurable. Use `redis://localhost:6379` for the included local Docker Compose Redis, or `rediss://...` when a hosted provider offers TLS. ioredis negotiates TLS from the `rediss://` URL.
 - Use one Redis database for the API and worker. Confirm the service supports standard Redis TCP commands and BullMQ's blocking/persistent connections; an HTTP-only Redis API is not sufficient.
 - No provider was named in the current repo configuration, so this change does not switch Redis accounts or assume the existing managed service is free. Check its billing plan or choose a free service that meets the connection requirements. Redis Cloud's current Free Essentials plan does not offer TLS, so consider that before putting its endpoint and password on a public network. [Redis TLS support](https://redis.io/docs/latest/operate/rc/security/database-security/tls-ssl/)
-- The worker runs locally with `npm run dev:worker` (or `npm run process:campaigns`) and the same `DATABASE_URL`, `REDIS_URL`, and `APP_URL` used for the demo. Point `APP_URL` at the public Render API origin so generated unsubscribe links work.
+- The worker runs on Railway in production and locally with `npm run dev:worker` (or `npm run process:campaigns`). Set `NODE_ENV=production` on the Railway service. Configure the same `DATABASE_URL`, `REDIS_URL`, and `CAMPAIGN_SENDER_ALLOWLIST` on Render and Railway. Point `APP_URL` at the public Render API origin so generated unsubscribe links work.
 - Keep `MESSAGE_MODE=fake` for development, seed data, and CI. Fake mode makes no external request and does not log recipient addresses or message bodies. Only set `MESSAGE_MODE=resend` after reviewing the exact campaign and recipients and intentionally enabling live delivery.
 - BullMQ retries temporary provider failures up to three times with exponential backoff, respecting Resend's `Retry-After` value when it is longer. Campaign and recipient identifiers produce a stable SHA-256 idempotency key for provider retries; sent recipients are skipped on retry, and exhausted jobs remain in BullMQ's failed set while the campaign is marked failed.
 
@@ -86,7 +88,19 @@ Configure the **worker** environment (the API service does not send campaign mes
 MESSAGE_MODE=resend
 RESEND_API_KEY=<server-side API key>
 RESEND_FROM_EMAIL=promotions@direconnect.app
+CAMPAIGN_SENDER_ALLOWLIST=<approved Supabase Auth user ID(s)>
 ```
+
+The allowlist is a comma-separated list of Supabase Auth user IDs, not email addresses. Production queueing is denied when the list is empty. Add the same list to Render and Railway; the API checks it before queueing and the worker checks it again before delivery. Set `NODE_ENV=production` on Railway so the worker also refuses fake-mode campaign processing.
+
+## Campaign abuse safeguards
+
+- Supabase user emails must be confirmed before a production campaign can be queued. Enable email confirmation in Supabase Auth settings.
+- A production sender must also be manually approved by adding their Supabase Auth user ID to `CAMPAIGN_SENDER_ALLOWLIST` on both Render and Railway. Find the ID in Supabase Dashboard → Authentication → Users. Keep the value empty until you approve the first sender; this intentionally blocks all production sends.
+- Campaigns are limited to 10 eligible recipients. The worker independently enforces the same cap.
+- The worker reserves each delivery in Postgres before contacting Resend and enforces rolling limits of 25 messages per account per 24 hours, 100 across the platform per 24 hours, and one campaign email per recipient per 24 hours. Reservations make retries count only once and prevent concurrent jobs from bypassing the limits.
+- The customer form and API default new records to email opt-out; the operator must explicitly record that the contact agreed to receive promotional email. Existing customer consent values are not changed automatically.
+- These conservative launch caps are source-controlled in `packages/validation/src/campaignSafety.ts`; adjust them only after reviewing abuse and deliverability risks.
 
 DireConnect calls Resend's `emails.send` SDK method once per queued recipient. This preserves the app's live consent checks, per-customer unsubscribe URLs, recipient-level delivery logs, and retry handling. Resend accepts idempotency keys for 24 hours; retries during that window use the same hashed key. The integration classifies rate limits, provider server errors, concurrent idempotency conflicts, and network failures as retryable; permanent provider errors are recorded as delivery failures. [Resend Node.js SDK](https://github.com/resend/resend-node) · [Resend send-email API](https://resend.com/docs/api-reference/emails/send-email) · [Resend idempotency keys](https://resend.com/docs/dashboard/emails/idempotency-keys)
 
@@ -96,7 +110,7 @@ Resend's Broadcasts API is designed for an Audience or Segment and manages its o
 
 - Keep the existing Supabase project, Auth, Postgres data, and schema.
 - Use `DATABASE_URL` with a pooler for application runtime when available. `packages/db/prisma.config.ts` uses `DIRECT_URL` for Prisma CLI commands when set, falling back to `DATABASE_URL`.
-- No database migration is needed for this service change. Do not run `prisma db push` or reset the production database as part of deployment.
+- The Prisma schema now defaults `Customer.emailOptIn` to `false`. After deploying the code, run `npm run db:push` manually with the production database URLs to sync this column default. It does not change existing customer rows. Do not reset the production database.
 - Supabase Free currently includes 500 MB database storage, 1 GB file storage, and 5 GB egress; free projects can pause after one week of inactivity and do not include automatic backups. Monitor actual project usage and keep independent backups for important data. [Supabase pricing](https://supabase.com/pricing)
 
 ## Environment files
@@ -107,7 +121,7 @@ Copy the example files to the corresponding ignored local files and keep secrets
 | --- | --- | --- |
 | Web | `apps/web/.env.local` | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, optional `NEXT_PUBLIC_SENTRY_DSN` |
 | API | `apps/api/.env` | `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `REDIS_URL`, `CLIENT_URL`, `PORT`, optional `SENTRY_DSN` |
-| Worker | `apps/worker/.env` | `DATABASE_URL`, `REDIS_URL`, `APP_URL`, `MESSAGE_MODE=fake`, optional Resend/Sentry values |
+| Worker | `apps/worker/.env` | `DATABASE_URL`, `REDIS_URL`, `APP_URL`, `CAMPAIGN_SENDER_ALLOWLIST`, `MESSAGE_MODE=fake`, optional Resend/Sentry values |
 | Prisma CLI | `packages/db/.env` | `DIRECT_URL` and `DATABASE_URL` |
 
 The root `.env.example` is a consolidated reference. Each workspace loads its own `.env` when run through its npm workspace script.

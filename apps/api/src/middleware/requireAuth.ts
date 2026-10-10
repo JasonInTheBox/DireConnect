@@ -5,6 +5,7 @@ export interface AuthenticatedRequest extends Request {
     user?: {
         id: string; 
         email?: string | undefined;
+        emailConfirmed: boolean;
     };
 }
 
@@ -33,6 +34,7 @@ export async function requireAuth(
     req.user = {
         id: user.id,
         email: user.email,
+        emailConfirmed: Boolean(user.email_confirmed_at || user.confirmed_at),
     };
 
     next();

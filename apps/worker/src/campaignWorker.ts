@@ -1,7 +1,11 @@
 import { fileURLToPath } from "node:url";
 import { Worker } from "bullmq";
 import { Redis } from "ioredis";
-import { prisma } from "@direconnect/db";
+import { prisma, reserveCampaignEmailSend } from "@direconnect/db";
+import {
+  CAMPAIGN_EMAIL_SAFETY_LIMITS,
+  isCampaignSenderApproved,
+} from "@direconnect/validation";
 import { workerEnv } from "./config/env.js";
 import { sendMessage } from "./services/messageSender.js";
 import { buildCampaignEmailHtml } from "./services/emailTemplate.js";
@@ -123,6 +127,53 @@ export async function processCampaignJob(
     });
 
     return { processed: true, sentCount: 0, failedCount, skippedCount };
+  }
+
+  const eligibleRecipientCount = campaign.recipientSnapshots.filter(
+    (snapshot) => snapshot.eligible,
+  ).length;
+
+  const requiresApprovedSender =
+    workerEnv.nodeEnv === "production" || workerEnv.messageMode === "resend";
+  const senderApproved = isCampaignSenderApproved(
+    ownerId,
+    workerEnv.campaignSenderAllowlist,
+  );
+
+  let campaignBlockReason: string | null = null;
+  if (workerEnv.nodeEnv === "production" && workerEnv.messageMode !== "resend") {
+    campaignBlockReason = "Production campaign delivery requires MESSAGE_MODE=resend.";
+  } else if (requiresApprovedSender && !senderApproved) {
+    campaignBlockReason = "Campaign sender is not approved for live email delivery.";
+  } else if (
+    eligibleRecipientCount >
+    CAMPAIGN_EMAIL_SAFETY_LIMITS.maxRecipientsPerCampaign
+  ) {
+    campaignBlockReason = `Campaign exceeds the ${CAMPAIGN_EMAIL_SAFETY_LIMITS.maxRecipientsPerCampaign}-recipient safety limit.`;
+  }
+
+  if (campaignBlockReason) {
+    await db.campaign.updateMany({
+      where: {
+        id: campaign.id,
+        businessId: campaign.businessId,
+        ownerId: campaign.ownerId,
+        status: "QUEUED",
+      },
+      data: { status: "FAILED" },
+    });
+    console.warn("Campaign blocked by delivery safety policy", {
+      campaignId: campaign.id,
+      ownerId: campaign.ownerId,
+      eligibleRecipientCount,
+      reason: campaignBlockReason,
+    });
+    return {
+      processed: true,
+      sentCount: 0,
+      failedCount: eligibleRecipientCount,
+      skippedCount: campaign.recipientSnapshots.length - eligibleRecipientCount,
+    };
   }
 
   const [existingLogs, customers] = await Promise.all([
@@ -255,6 +306,44 @@ export async function processCampaignJob(
             website: campaign.business.website,
           })
         : undefined;
+
+    // Custom database doubles are used by local unit tests. The production
+    // Prisma singleton always reserves a persistent quota slot before delivery.
+    if (db === prisma) {
+      const reservation = await reserveCampaignEmailSend({
+        ownerId: activeCampaign.ownerId,
+        businessId: activeCampaign.businessId,
+        campaignId: activeCampaign.id,
+        customerId: snapshot.customerId,
+        recipient: currentCustomer.email,
+        now: now(),
+        limits: {
+          perAccount:
+            CAMPAIGN_EMAIL_SAFETY_LIMITS.maxEmailsPerAccountPer24Hours,
+          perPlatform:
+            CAMPAIGN_EMAIL_SAFETY_LIMITS.maxEmailsPerPlatformPer24Hours,
+          perRecipient:
+            CAMPAIGN_EMAIL_SAFETY_LIMITS.maxEmailsPerRecipientPer24Hours,
+        },
+      });
+
+      latestLogByCustomer.set(snapshot.customerId, reservation.log);
+
+      if (reservation.status === "already-sent") {
+        sentCount += 1;
+        continue;
+      }
+
+      if (reservation.status === "blocked") {
+        failedCount += 1;
+        console.warn("Campaign recipient blocked by sending limits", {
+          campaignId: activeCampaign.id,
+          ownerId: activeCampaign.ownerId,
+          reason: reservation.reason,
+        });
+        continue;
+      }
+    }
 
     const sendResult = await messageSender({
       channel: "EMAIL",
