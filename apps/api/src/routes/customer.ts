@@ -77,7 +77,8 @@ export function createCustomerRouter(
         return res.status(404).json({ error: "Business not found" });
       }
 
-      const nextEmailOptIn = emailOptIn ?? true;
+      // Consent must be an explicit choice; never infer marketing consent.
+      const nextEmailOptIn = emailOptIn ?? false;
       const nextSmsOptIn = smsOptIn ?? false;
       const isSubscribedToAnyChannel = nextEmailOptIn || nextSmsOptIn;
 

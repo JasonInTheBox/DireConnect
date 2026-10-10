@@ -35,7 +35,7 @@ export default function BusinessCustomersPage({ params }: PageProps) {
     const [email, setEmail] = useState("");
     const [phone, setPhone] = useState("");
 
-    const [emailOptIn, setEmailOptIn] = useState(true);
+    const [emailOptIn, setEmailOptIn] = useState(false);
     const [smsOptIn, setSmsOptIn] = useState(false);
 
     async function getAuthHeaders() {
@@ -86,7 +86,7 @@ export default function BusinessCustomersPage({ params }: PageProps) {
       setLastName("");
       setEmail("");
       setPhone("");
-      setEmailOptIn(true);
+      setEmailOptIn(false);
       setSmsOptIn(false);
     }
 
@@ -96,7 +96,7 @@ export default function BusinessCustomersPage({ params }: PageProps) {
     setLastName(customer.lastName || "");
     setEmail(customer.email || "");
     setPhone(customer.phone || "");
-    setEmailOptIn(customer.emailOptIn ?? true);
+    setEmailOptIn(customer.emailOptIn ?? false);
     setSmsOptIn(customer.smsOptIn ?? false);
   }
 
@@ -229,7 +229,7 @@ export default function BusinessCustomersPage({ params }: PageProps) {
                   onChange={(e) => setEmailOptIn(e.target.checked)}
                   className="h-4 w-4 rounded border-gray-700 bg-gray-900"
                 />
-                Email opt-in
+                Customer explicitly agreed to receive promotional emails
               </label>
 
               <label className="flex items-center gap-2 text-sm text-gray-300">

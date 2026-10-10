@@ -23,5 +23,7 @@ services:
         sync: false
       - key: REDIS_URL
         sync: false
+      - key: CAMPAIGN_SENDER_ALLOWLIST
+        sync: false
       - key: CLIENT_URL
         sync: false

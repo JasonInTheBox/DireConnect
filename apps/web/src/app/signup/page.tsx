@@ -21,7 +21,9 @@ export default function SignupPage() {
             return;
         }
         
-        alert("Signup successful. Check your email if confirmation is enabled.");
+        alert(
+          "Signup successful. Check your inbox and confirm your email before sending campaigns.",
+        );
     }
 
     return (

@@ -24,7 +24,7 @@ model Customer {
   email      String?
   phone      String?
 
-  emailOptIn Boolean  @default(true)
+  emailOptIn Boolean  @default(false)
   smsOptIn   Boolean  @default(false)
   unsubscribedAt  DateTime?
   unsubscribeToken  String? @unique
