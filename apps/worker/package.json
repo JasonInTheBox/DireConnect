@@ -5,9 +5,9 @@
   "main": "index.js",
   "scripts": {
     "process:campaigns": "tsx src/processQueuedCampaigns.ts",
-    "dev": "tsx src/campaignWorker.ts",
+    "dev": "node --import tsx --import ./src/instrument.ts --watch ./src/campaignWorker.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/campaignWorker.js"
+    "start": "node --import ./dist/instrument.js dist/campaignWorker.js"
   },
   "keywords": [],
   "author": "",
