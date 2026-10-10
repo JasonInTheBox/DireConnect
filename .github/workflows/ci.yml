@@ -6,24 +6,26 @@ on:
       - main
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build monorepo
     runs-on: ubuntu-latest
-
     env:
-      DATABASE_URL: postgresql://postgres.xfpyscsjqxiqwxdgreth:Iloveeula2005%40@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true
-      SUPABASE_URL: https://xfpyscsjqxiqwxdgreth.supabase.co
-      SUPABASE_JWT_SECRET: OSvq/aJ4uh24VOi1Vze0S78ZEVjhytrYR9Qh+rBbFvDdsIsEQF3HLC1t0vumKq7KT4TRm4HTcQ/He8J92kIh2A==
+      # CI-only placeholders. Never use deployment credentials here; delivery stays in fake mode.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      SUPABASE_URL: https://example.supabase.co
+      SUPABASE_PUBLISHABLE_KEY: fake-publishable-key
       REDIS_URL: redis://localhost:6379
       CLIENT_URL: http://localhost:3000
-      NEXT_PUBLIC_API_URL: https://d9auoa5p89nsz.cloudfront.net
-      NEXT_PUBLIC_SUPABASE_URL: https://xfpyscsjqxiqwxdgreth.supabase.co
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmcHlzY3NqcXhpcXd4ZGdyZXRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3OTk0NjUsImV4cCI6MjA5MjM3NTQ2NX0.GOrmD5Z3H25EDHzbNnPStAeLHEdfeb08AyphFFiEGH4
-      SUPABASE_PUBLISHABLE_KEY: sb_publishable_FmMhANrFoiTW-a9KosCvcg_gAVnfQXN
-      MESSAGE_MODE: aws
       APP_URL: http://localhost:4000
-      AWS_REGION: us-west-1
+      MESSAGE_MODE: fake
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: fake-publishable-key
 
     steps:
       - name: Checkout repository
@@ -44,21 +46,24 @@ jobs:
       - name: Build shared packages
         run: npm run build:packages
 
-      - name: Run tests
-        run: npm test
-
-      - name: Build API
-        run: npm run build -w apps/api
-
-      - name: Build worker
-        run: npm run build -w apps/worker
-
-      - name: Prepare frontend env
+      - name: Test and build applications in parallel
         run: |
-          echo "NEXT_PUBLIC_API_URL=https://d9auoa5p89nsz.cloudfront.net" >> apps/web/.env.production
-          echo "NEXT_PUBLIC_SUPABASE_URL=https://xfpyscsjqxiqwxdgreth.supabase.co" >> apps/web/.env.production
-          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmcHlzY3NqcXhpcXd4ZGdyZXRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3OTk0NjUsImV4cCI6MjA5MjM3NTQ2NX0.GOrmD5Z3H25EDHzbNnPStAeLHEdfeb08AyphFFiEGH4" >> apps/web/.env.production
-          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_FmMhANrFoiTW-a9KosCvcg_gAVnfQXN" >> apps/web/.env.production
+          npm test &
+          test_pid=$!
+          npm run build -w apps/api &
+          api_pid=$!
+          npm run build -w apps/worker &
+          worker_pid=$!
+          npm run build -w apps/web &
+          web_pid=$!
 
-      - name: Build frontend
-        run: npm run build -w apps/web
+          failed=""
+          wait "$test_pid" || failed="$failed tests"
+          wait "$api_pid" || failed="$failed api"
+          wait "$worker_pid" || failed="$failed worker"
+          wait "$web_pid" || failed="$failed frontend"
+
+          if [ -n "$failed" ]; then
+            printf 'Failed checks:%s\n' "$failed"
+            exit 1
+          fi

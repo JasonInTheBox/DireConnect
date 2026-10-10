@@ -162,7 +162,8 @@ export default function CampaignPreviewPage({ params }: PageProps) {
               </p>
             </div>
 
-            {preview.campaign.status === "DRAFT" && (
+            {preview.campaign.status === "DRAFT" &&
+              preview.campaign.channel === "EMAIL" && (
               <button
                 onClick={handleQueue}
                 className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
@@ -171,6 +172,12 @@ export default function CampaignPreviewPage({ params }: PageProps) {
               </button>
             )}
           </div>
+          {preview.campaign.status === "DRAFT" &&
+            preview.campaign.channel === "SMS" && (
+              <p className="mt-3 text-sm text-amber-300">
+                SMS sending is temporarily disabled. This campaign cannot be queued.
+              </p>
+            )}
         </section>
 
         <section className="mb-8 grid gap-4 md:grid-cols-3">

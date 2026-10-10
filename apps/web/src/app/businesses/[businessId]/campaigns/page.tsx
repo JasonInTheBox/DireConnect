@@ -70,10 +70,9 @@ export default function BusinessCampaignsPage({ params }: PageProps) {
 
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
-  const [channel, setChannel] = useState<"EMAIL" | "SMS">("EMAIL");
   const [sendAt, setSendAt] = useState("");
   const [targetAudience, setTargetAudience] = useState<
-    "ALL" | "EMAIL_OPTED_IN" | "SMS_OPTED_IN"
+    "ALL" | "EMAIL_OPTED_IN"
   >("ALL");
 
   async function getAuthHeaders() {
@@ -169,17 +168,19 @@ export default function BusinessCampaignsPage({ params }: PageProps) {
     setEditingCampaignId(null);
     setTitle("");
     setMessage("");
-    setChannel("EMAIL");
     setSendAt("");
     setTargetAudience("ALL");
   }
 
   function handleEdit(campaign: Campaign) {
+    if (campaign.channel !== "EMAIL") return;
+
     setEditingCampaignId(campaign.id);
     setTitle(campaign.title);
     setMessage(campaign.message);
-    setChannel(campaign.channel);
-    setTargetAudience(campaign.targetAudience ?? "ALL");
+    setTargetAudience(
+      campaign.targetAudience === "EMAIL_OPTED_IN" ? "EMAIL_OPTED_IN" : "ALL",
+    );
 
     if (campaign.sendAt) {
       setSendAt(campaign.sendAt.slice(0, 16));
@@ -194,7 +195,7 @@ export default function BusinessCampaignsPage({ params }: PageProps) {
     const campaignData = {
       title,
       message,
-      channel,
+      channel: "EMAIL",
       sendAt,
       targetAudience,
     };
@@ -349,34 +350,21 @@ export default function BusinessCampaignsPage({ params }: PageProps) {
             />
 
             <div className="grid gap-4 md:grid-cols-3">
-              <select
-                className="w-full rounded-lg border border-gray-700 bg-gray-950 px-4 py-2 text-gray-100 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-900"
-                value={channel}
-                onChange={(e) =>
-                  setChannel(e.target.value as "EMAIL" | "SMS")
-                }
-              >
-                <option value="EMAIL">Email</option>
-                <option value="SMS">SMS</option>
-              </select>
+              <div className="flex items-center rounded-lg border border-gray-700 bg-gray-950 px-4 py-2 text-gray-300">
+                Email campaign
+              </div>
 
               <select
                 className="w-full rounded-lg border border-gray-700 bg-gray-950 px-4 py-2 text-gray-100 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-900"
                 value={targetAudience}
                 onChange={(e) =>
-                  setTargetAudience(
-                    e.target.value as
-                      | "ALL"
-                      | "EMAIL_OPTED_IN"
-                      | "SMS_OPTED_IN"
-                  )
+                  setTargetAudience(e.target.value as "ALL" | "EMAIL_OPTED_IN")
                 }
               >
                 <option value="ALL">All eligible customers</option>
                 <option value="EMAIL_OPTED_IN">
                   Email opted-in customers
                 </option>
-                <option value="SMS_OPTED_IN">SMS opted-in customers</option>
               </select>
 
               <input
@@ -524,19 +512,27 @@ export default function BusinessCampaignsPage({ params }: PageProps) {
                     <div className="mt-5 flex flex-wrap gap-3">
                       {campaign.status === "DRAFT" && (
                         <>
-                          <button
-                            onClick={() => handleQueue(campaign.id)}
-                            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
-                          >
-                            {getQueueButtonLabel(campaign)}
-                          </button>
+                          {campaign.channel === "EMAIL" ? (
+                            <>
+                              <button
+                                onClick={() => handleQueue(campaign.id)}
+                                className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+                              >
+                                {getQueueButtonLabel(campaign)}
+                              </button>
 
-                          <button
-                            onClick={() => handleEdit(campaign)}
-                            className="rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-100 hover:bg-gray-700"
-                          >
-                            Edit
-                          </button>
+                              <button
+                                onClick={() => handleEdit(campaign)}
+                                className="rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-100 hover:bg-gray-700"
+                              >
+                                Edit
+                              </button>
+                            </>
+                          ) : (
+                            <p className="self-center text-sm text-amber-300">
+                              SMS sending is temporarily disabled.
+                            </p>
+                          )}
 
                           <button
                             onClick={() => handleDelete(campaign.id)}

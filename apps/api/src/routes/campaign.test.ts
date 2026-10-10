@@ -208,6 +208,27 @@ describe("campaign routes", () => {
     expect(mocks.campaignCreate).not.toHaveBeenCalled();
   });
 
+  it("POST /businesses/:businessId/campaigns rejects SMS campaigns", async () => {
+    mocks.businessFindUnique.mockResolvedValue({
+      id: "business-1",
+      ownerId: "user-1",
+      name: "Jason's Test Business",
+    });
+
+    const response = await request(createTestApp())
+      .post("/businesses/business-1/campaigns")
+      .send({
+        title: "SMS Promo",
+        message: "Hello customers",
+        channel: "SMS",
+        targetAudience: "SMS_OPTED_IN",
+      });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error).toMatch(/SMS campaigns are temporarily disabled/);
+    expect(mocks.campaignCreate).not.toHaveBeenCalled();
+  });
+
   it("GET /businesses/:businessId/campaigns/:campaignId/preview returns audience preview", async () => {
     mocks.businessFindUnique.mockResolvedValue({
       id: "business-1",
@@ -340,6 +361,7 @@ describe("campaign routes", () => {
           businessId: "business-1",
           ownerId: "user-1",
           status: "DRAFT",
+          channel: "EMAIL",
         },
         data: {
           status: "QUEUED",
@@ -364,5 +386,29 @@ describe("campaign routes", () => {
         removeOnFail: false,
       }),
     );
+  });
+
+  it("does not queue an existing SMS draft", async () => {
+    mocks.businessFindUnique.mockResolvedValue({
+      id: "business-1",
+      ownerId: "user-1",
+      name: "Jason's Test Business",
+    });
+    mocks.campaignFindFirst.mockResolvedValue({
+      id: "campaign-sms",
+      businessId: "business-1",
+      ownerId: "user-1",
+      channel: "SMS",
+      status: "DRAFT",
+    });
+
+    const response = await request(createTestApp()).post(
+      "/businesses/business-1/campaigns/campaign-sms/queue",
+    );
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toMatch(/SMS campaigns are temporarily disabled/);
+    expect(mocks.campaignUpdateMany).not.toHaveBeenCalled();
+    expect(mocks.queueAdd).not.toHaveBeenCalled();
   });
 });
