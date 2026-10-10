@@ -6,13 +6,17 @@ on:
       - main
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
-    name: Test and build monorepo
+    name: Build monorepo
     runs-on: ubuntu-latest
     env:
+      # CI-only placeholders. Never use deployment credentials here; delivery stays in fake mode.
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
-      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/postgres
       SUPABASE_URL: https://example.supabase.co
       SUPABASE_PUBLISHABLE_KEY: fake-publishable-key
       REDIS_URL: redis://localhost:6379
@@ -42,14 +46,24 @@ jobs:
       - name: Build shared packages
         run: npm run build:packages
 
-      - name: Run tests
-        run: npm test
+      - name: Test and build applications in parallel
+        run: |
+          npm test &
+          test_pid=$!
+          npm run build -w apps/api &
+          api_pid=$!
+          npm run build -w apps/worker &
+          worker_pid=$!
+          npm run build -w apps/web &
+          web_pid=$!
 
-      - name: Build API
-        run: npm run build -w apps/api
+          failed=""
+          wait "$test_pid" || failed="$failed tests"
+          wait "$api_pid" || failed="$failed api"
+          wait "$worker_pid" || failed="$failed worker"
+          wait "$web_pid" || failed="$failed frontend"
 
-      - name: Build worker
-        run: npm run build -w apps/worker
-
-      - name: Build frontend
-        run: npm run build -w apps/web
+          if [ -n "$failed" ]; then
+            printf 'Failed checks:%s\n' "$failed"
+            exit 1
+          fi
