@@ -10,15 +10,18 @@ initSentry();
 
 const app = express();
 
-const allowedOrigins = [
-  process.env.CLIENT_URL,
+const allowedOrigins = new Set([
+  ...(process.env.CLIENT_URL ?? "")
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/+$/, ""))
+    .filter(Boolean),
   "http://localhost:3000",
-].filter(Boolean);
+]);
 
 app.use(
     cors({ 
         origin(origin, callback) {
-            if (!origin || allowedOrigins.includes(origin)) {
+            if (!origin || allowedOrigins.has(origin)) {
                 callback(null, true);
                 return;
             }
