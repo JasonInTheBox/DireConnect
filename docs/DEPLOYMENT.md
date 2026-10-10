@@ -37,12 +37,12 @@ Vercel Hobby currently costs $0, but its terms restrict use to personal, non-com
    | `SUPABASE_URL` | Supabase project URL |
    | `SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key used by the API's Supabase client |
    | `REDIS_URL` | The same BullMQ-compatible Redis URL used by the worker |
-   | `CLIENT_URL` | Exact deployed Vercel origin, without a trailing slash or path |
+   | `CLIENT_URL` | Comma-separated exact Vercel origins, without trailing slashes or paths |
    | `SENTRY_DSN` | Optional API Sentry DSN; leave unset to disable reporting |
 
    Render provides `PORT`; the blueprint sets the app port to `4000` for clarity. Do not put database, JWT, Redis, Resend, or Sentry secrets in `NEXT_PUBLIC_` variables.
 
-4. After the first deploy, copy the Render `onrender.com` URL. Set that as `NEXT_PUBLIC_API_URL` in Vercel and use the exact Vercel origin as Render's `CLIENT_URL`.
+4. After the first deploy, copy the Render `onrender.com` URL. Set that as `NEXT_PUBLIC_API_URL` in Vercel and set Render's `CLIENT_URL` to every active Vercel origin, comma-separated (for example, `https://direconnect.app,https://www.direconnect.app`).
 5. Confirm `https://<render-api-host>/health` returns `{"status":"ok","service":"direconnect-api",...}`.
 
 The free web service has a cold start and usage limits. Avoid paid add-ons, persistent disks, and paid plan upgrades if the goal is $0/month. Render can bill for some overages if a payment method is attached; otherwise it can suspend free services when limits are exceeded. Check workspace usage in the Render dashboard. [Render free limits and billing behavior](https://render.com/docs/free)
