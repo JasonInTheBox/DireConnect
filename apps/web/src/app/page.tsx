@@ -2,20 +2,24 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { apiUrl } from "@/lib/api";
 
 export default function Home() {
 
-  const [message, setMessage] = useState("");
-
   useEffect(() => {
-    async function fetchHealth() {
-      const res = await fetch(apiUrl("/api/health"));
-      const data = await res.json();
-      setMessage(data.message);
+    async function checkApiHealth() {
+      try {
+        const response = await fetch(apiUrl("/health"));
+        if (!response.ok) {
+          throw new Error(`API health check failed (${response.status})`);
+        }
+      } catch (error) {
+        console.error("Could not reach the DireConnect API:", error);
+      }
     }
-    fetchHealth();
+
+    void checkApiHealth();
   }, []);
 
   return (
