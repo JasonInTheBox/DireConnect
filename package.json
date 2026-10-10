@@ -17,6 +17,7 @@
     "db:push": "npm run db:push -w packages/db",
     "build:packages": "npm run build -w packages/db && npm run build -w packages/validation",
     "build:apps": "npm run build -w apps/api && npm run build -w apps/worker && npm run build -w apps/web",
+    "build:worker": "npm run db:generate && npm run build -w packages/db && npm run build -w apps/worker",
     "build": "npm run db:generate && npm run build:packages && npm run build:apps",
     "start:web": "npm run start -w apps/web",
     "start:api": "npm run start -w apps/api",
