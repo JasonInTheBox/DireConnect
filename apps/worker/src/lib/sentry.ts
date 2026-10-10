@@ -11,7 +11,7 @@ export function initSentry() {
     dsn: process.env.SENTRY_DSN,
     enabled: Boolean(process.env.SENTRY_DSN) && process.env.NODE_ENV !== "test",
     environment: process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV,
-    tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
+    tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 0,
     sendDefaultPii: false,
   });
 

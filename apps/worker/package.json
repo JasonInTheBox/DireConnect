@@ -20,7 +20,6 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@aws-sdk/client-ses": "^3.1049.0",
     "@direconnect/db": "*",
     "@sentry/node": "^10.62.0",
     "bullmq": "^5.76.10",
@@ -30,6 +29,7 @@
     "lodash.isarguments": "^3.1.0",
     "lodash.isobject": "^3.0.2",
     "msgpackr": "^2.0.2",
-    "node-abort-controller": "^3.1.1"
+    "node-abort-controller": "^3.1.1",
+    "resend": "^6.32.1"
   }
 }

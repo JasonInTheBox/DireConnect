@@ -1,221 +1,72 @@
 # DireConnect
 
-![CI](https://github.com/JasonInTheBox/DireConnect/actions/workflows/ci.yml/badge.svg)
-![Docker Build](https://github.com/JasonInTheBox/DireConnect/actions/workflows/docker-build.yml/badge.svg)
-![E2E](https://github.com/JasonInTheBox/DireConnect/actions/workflows/e2e.yml/badge.svg)
+DireConnect is a portfolio full-stack customer and campaign management app. It uses Next.js, an Express API, Supabase Auth and PostgreSQL, Prisma, and BullMQ for campaign jobs.
 
-## DireConnect
+## Features
 
-DireConnect is a full-stack customer and campaign management application built to practice production-style software engineering. The app lets authenticated users create businesses, manage customers, create email or SMS campaigns, preview eligible recipients, queue campaigns, process campaign jobs in a background worker, and view campaign logs and analytics.
+- Supabase sign-in and protected API routes
+- Business and customer management with owner checks
+- Email campaign creation, audience preview, scheduling, unsubscribe handling, and delivery logs
+- BullMQ campaign queue and an independently runnable worker
+- SMS consent and historical campaign data remain stored, while SMS sending is disabled
+- Development email simulation that never contacts an email provider
+- Sentry error reporting and automated CI/E2E checks
 
+## Services
 
-## Live Demo
+| Concern | Service |
+| --- | --- |
+| Frontend | Vercel, subject to Hobby plan's personal and non-commercial use restriction |
+| API | Render Free web service |
+| Database, auth, and file storage | Supabase Free |
+| Email | Resend Node.js SDK |
+| Queue | BullMQ with a Redis-compatible service or local Redis |
+| Worker | Run locally for development/demo; no always-on free worker is assumed |
+| Monitoring | Sentry |
 
-Frontend: https://main.d8j6rr4pntmji.amplifyapp.com  
-API Health Check: https://d9auoa5p89nsz.cloudfront.net/health
+See [DEPLOYMENT.md](DEPLOYMENT.md) for account setup, environment variables, free-tier limits, and AWS cleanup steps. `render.yaml` describes the free Render API web service. The worker is intentionally not included in that deployment because Render's free web service sleeps when idle and a continuous background worker is not a free service type.
 
-Note: The deployed API/worker may be scaled down outside of demo periods to control AWS costs.
+## Local development
 
+Use Node.js 22 and npm. Start local Redis with Docker Compose:
 
-## Tech Stack
+```bash
+docker compose up redis -d
+```
 
-### Frontend
-
-* Next.js
-* React
-* TypeScript
-* Tailwind CSS
-* Supabase Auth
-
-### Backend
-
-* Node.js
-* Express
-* TypeScript
-* Prisma
-* Zod
-* Supabase PostgreSQL
-
-### Background Jobs
-
-* BullMQ
-* Redis
-* Worker service for campaign processing
-
-### Cloud / Deployment
-
-* AWS Amplify for frontend hosting
-* Amazon ECR for Docker image storage
-* Amazon ECS Fargate for API and worker containers
-* Application Load Balancer for API traffic
-* CloudFront for HTTPS API access
-* CloudWatch for logs
-* GitHub Actions for CI checks
-
-## Core Features
-
-* User authentication with Supabase Auth
-* Business creation and ownership-based access control
-* Customer CRUD operations
-* Email and SMS opt-in tracking
-* Campaign creation and editing
-* Campaign audience preview
-* Campaign queueing with recipient snapshots
-* Background worker processing through BullMQ
-* Message logs and campaign analytics
-* Unsubscribe support through customer tokens
-
-## Architecture Overview
-
-The frontend is deployed through AWS Amplify and communicates with the backend API over HTTPS through CloudFront. CloudFront forwards API requests to an Application Load Balancer, which routes traffic to the Express API running on ECS Fargate.
-
-The API handles authentication, business/customer/campaign routes, validation, and campaign queueing. Campaign jobs are pushed into Redis through BullMQ. A separate ECS Fargate worker consumes queued jobs, checks recipient snapshots, sends messages in fake or real mode, and writes message logs back to the database.
-
-
-## Architecture
+Copy and fill in the example environment files. Use real Supabase values and a local or TLS-enabled Redis URL as needed. Keep `MESSAGE_MODE=fake` while developing:
 
 ```text
-User Browser
-    |
-    v
-AWS Amplify Frontend
-    |
-    v
-CloudFront HTTPS API URL
-    |
-    v
-Application Load Balancer
-    |
-    v
-ECS Fargate API Container
-    |
-    +--> Supabase PostgreSQL
-    |
-    +--> Redis / BullMQ Queue
-              |
-              v
-        ECS Fargate Worker
-              |
-              v
-        Message Logs / Campaign Analytics
-
-## Monitoring
-
-This project uses Sentry for error monitoring across the frontend, API, and background worker.
-
-- Frontend errors are captured from the Next.js app.
-- API errors are captured from the Express server.
-- Worker errors are captured from the BullMQ campaign processing worker.
-- Production logs are also available through AWS CloudWatch.
-
-## Testing
-
-This project includes several layers of automated testing:
-
-* Zod schema validation tests
-* Express validation middleware tests
-* API route tests for business, customer, and campaign routes
-* Campaign eligibility unit tests
-* Worker tests for campaign job processing
-* Playwright frontend smoke tests
-* GitHub Actions CI for automated build and test checks
-
-## Deployment
-
-The application was deployed using AWS services:
-
-* Frontend: AWS Amplify
-* API: ECS Fargate behind an Application Load Balancer
-* API HTTPS layer: CloudFront
-* Worker: ECS Fargate background service
-* Docker images: Amazon ECR
-* Logs: CloudWatch
-* Database/Auth: Supabase
-* Queue: Redis/BullMQ
-
-## Deployment Runbook
-
-```
-Deployment, scaling, health checks, and troubleshooting steps are documented in:
-
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+apps/web/.env.example       -> apps/web/.env.local
+apps/api/.env.example       -> apps/api/.env
+apps/worker/.env.example    -> apps/worker/.env
+packages/db/.env.example    -> packages/db/.env
 ```
 
-## Local Development
-
-Install dependencies:
+Install dependencies, generate Prisma Client, and build shared packages:
 
 ```bash
-npm install
-```
-
-Generate Prisma client:
-
-```bash
+npm ci
 npm run db:generate
-```
-
-Build shared packages:
-
-```bash
 npm run build:packages
 ```
 
-Run the frontend:
+Run each app in its own terminal:
 
 ```bash
 npm run dev:web
-```
-
-Run the API:
-
-```bash
 npm run dev:api
-```
-
-Run the worker:
-
-```bash
 npm run dev:worker
 ```
 
-Run tests:
+`npm run process:campaigns` is retained as a worker CLI alias and listens to the same BullMQ queue. Keep `MESSAGE_MODE=fake` while developing. Set `MESSAGE_MODE=resend` only after reviewing the exact campaign and recipients and intentionally enabling live delivery.
+
+## Checks
 
 ```bash
 npm test
-```
-
-Run frontend E2E tests:
-
-```bash
 npm run test:e2e
-```
-
-Run full build:
-
-```bash
 npm run build
 ```
 
-## Environment Variables
-
-This project uses separate environment variables for the frontend, API, worker, database, queue, monitoring, and deployment.
-
-Example files are provided:
-
-- `.env.example`
-- `apps/web/.env.example`
-- `apps/api/.env.example`
-- `apps/worker/.env.example`
-
-Copy the relevant example file and fill in local values:
-
-```bash
-cp .env.example .env
-cp apps/web/.env.example apps/web/.env.local
-cp apps/api/.env.example apps/api/.env
-cp apps/worker/.env.example apps/worker/.env
-
-## What I Learned
-
-Through this project, I practiced full-stack development, authentication, database modeling, API design, background job processing, cloud deployment, Docker, AWS ECS/Fargate, CloudFront, CI/CD, automated testing, and production-style debugging.
+CI uses fake Supabase configuration and `MESSAGE_MODE=fake`; it does not send email or SMS.

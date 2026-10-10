@@ -428,6 +428,12 @@ export function createCampaignRouter(
         return res.status(404).json({ error: "Business not found" });
       }
 
+      if (channel === "SMS") {
+        return res.status(422).json({
+          error: "SMS campaigns are temporarily disabled. Create an email campaign instead.",
+        });
+      }
+
       const campaign = await db.campaign.create({
         data: {
           ownerId: req.user!.id,
@@ -468,12 +474,19 @@ export function createCampaignRouter(
         return res.status(404).json({ error: "Business not found" });
       }
 
+      if (channel === "SMS") {
+        return res.status(422).json({
+          error: "SMS campaigns are temporarily disabled. Create an email campaign instead.",
+        });
+      }
+
       const result = await db.campaign.updateMany({
         where: {
           id: campaignId,
           businessId,
           ownerId: req.user!.id,
           status: "DRAFT",
+          channel: "EMAIL",
         },
         data: {
           title,
@@ -523,12 +536,34 @@ export function createCampaignRouter(
         return res.status(404).json({ error: "Business not found" });
       }
 
+      const draftCampaign = await db.campaign.findFirst({
+        where: {
+          id: campaignId,
+          businessId,
+          ownerId: req.user!.id,
+          status: "DRAFT",
+        },
+      });
+
+      if (!draftCampaign) {
+        return res.status(404).json({
+          error: "Draft campaign not found or campaign is already queued/sent",
+        });
+      }
+
+      if (draftCampaign.channel === "SMS") {
+        return res.status(409).json({
+          error: "SMS campaigns are temporarily disabled and cannot be queued.",
+        });
+      }
+
       const result = await db.campaign.updateMany({
         where: {
           id: campaignId,
           businessId,
           ownerId: req.user!.id,
           status: "DRAFT",
+          channel: "EMAIL",
         },
         data: {
           status: "QUEUED",
@@ -607,10 +642,10 @@ export function createCampaignRouter(
         },
         {
           delay,
+          jobId: `campaign-${campaignId}`,
           attempts: 3,
           backoff: {
-            type: "exponential",
-            delay: 5000,
+            type: "custom",
           },
           removeOnComplete: true,
           removeOnFail: false,
