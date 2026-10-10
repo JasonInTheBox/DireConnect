@@ -41,9 +41,15 @@ export async function reserveCampaignEmailSend({
 
   return prisma.$transaction(async (tx) => {
     // Acquire locks in a consistent order to avoid deadlocks.
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended('direconnect:campaign-email:platform', 0))`;
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`owner:${ownerId}`}, 0))`;
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`recipient:${normalizedRecipient}`}, 0))`;
+    // Prisma's PostgreSQL adapter cannot deserialize a raw `void` result. Keep
+    // the lock call inside a subquery and return an ordinary integer instead.
+    const acquireLock = (key: string) => tx.$queryRaw`
+      SELECT 1::int AS acquired
+      FROM (SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))) AS advisory_lock
+    `;
+    await acquireLock("direconnect:campaign-email:platform");
+    await acquireLock(`owner:${ownerId}`);
+    await acquireLock(`recipient:${normalizedRecipient}`);
 
     const existing = await tx.messageLog.findFirst({
       where: { campaignId, customerId, ownerId, businessId },
