@@ -25,6 +25,7 @@ export function Dialog({
   hideTitle = false,
 }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
+  const pointerDownOnBackdrop = useRef(false);
   const titleId = useId();
   const descriptionId = useId();
 
@@ -64,8 +65,15 @@ export function Dialog({
           onClose();
         }
       }}
+      onPointerDown={(event) => {
+        pointerDownOnBackdrop.current = event.target === event.currentTarget;
+      }}
       onClick={(event) => {
-        if (event.target === event.currentTarget) {
+        // Close only when both the press and the release landed on the backdrop itself,
+        // so a drag that starts inside the content and ends outside does not dismiss.
+        const startedOnBackdrop = pointerDownOnBackdrop.current;
+        pointerDownOnBackdrop.current = false;
+        if (startedOnBackdrop && event.target === event.currentTarget) {
           onClose();
         }
       }}
@@ -98,7 +106,7 @@ export function Dialog({
                 type="button"
                 aria-label="Close"
                 onClick={onClose}
-                className="-mr-1.5 -mt-1.5 rounded-control p-1.5 text-muted transition-colors hover:bg-sunken hover:text-ink"
+                className="-my-2 -mr-3 flex min-h-10 min-w-10 items-center justify-center rounded-control text-muted transition-colors hover:bg-sunken hover:text-ink lg:-my-1.5 lg:-mr-2.5 lg:min-h-9 lg:min-w-9"
               >
                 <Icon name="x" />
               </button>
