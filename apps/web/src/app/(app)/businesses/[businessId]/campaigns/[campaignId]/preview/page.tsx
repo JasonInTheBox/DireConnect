@@ -111,16 +111,16 @@ export default function CampaignPreviewPage({ params }: PageProps) {
 
   if (!preview) {
     return (
-      <main className="min-h-screen bg-gray-950 px-6 py-8 text-gray-100">
+      <div className="min-h-screen bg-gray-950 px-6 py-8 text-gray-100">
         <div className="mx-auto max-w-5xl">
           <p className="text-gray-400">Loading preview...</p>
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 px-6 py-8 text-gray-100">
+    <div className="min-h-screen bg-gray-950 px-6 py-8 text-gray-100">
       <div className="mx-auto max-w-5xl">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -271,6 +271,6 @@ export default function CampaignPreviewPage({ params }: PageProps) {
           </div>
         </section>
       </div>
-    </main>
+    </div>
   );
 }

@@ -156,7 +156,7 @@ export default function BusinessCustomersPage({ params }: PageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 px-6 py-8 text-gray-100">
+    <div className="min-h-screen bg-gray-950 px-6 py-8 text-gray-100">
       <div className="mx-auto max-w-5xl">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -343,6 +343,6 @@ export default function BusinessCustomersPage({ params }: PageProps) {
           )}
         </section>
       </div>
-    </main>
+    </div>
   );
 }
