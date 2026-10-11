@@ -95,3 +95,34 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Dialogs and drawers fade in when opened (a response to a user action). */
+dialog[open] {
+  animation: dialog-in 140ms ease-out;
+}
+
+dialog.drawer[open] {
+  animation: drawer-in 160ms ease-out;
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
