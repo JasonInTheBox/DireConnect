@@ -12,12 +12,9 @@ const SIDEBAR_KEY = "dc.sidebar";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
+  // Safe to read localStorage here: SessionProvider renders only its fallback on the server, so AppShell is never server-rendered.
+  const [collapsed, setCollapsed] = useState(() => readPreference(SIDEBAR_KEY) === "collapsed");
   const [drawerOpen, setDrawerOpen] = useState(false);
-
-  useEffect(() => {
-    setCollapsed(readPreference(SIDEBAR_KEY) === "collapsed");
-  }, []);
 
   useEffect(() => {
     setDrawerOpen(false);
@@ -40,7 +37,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <aside
         className={cn(
-          "sticky top-0 hidden h-screen shrink-0 border-r border-line bg-surface transition-[width] duration-150 lg:block",
+          "sticky top-0 z-20 hidden h-screen shrink-0 border-r border-line bg-surface transition-[width] duration-150 lg:block",
           collapsed ? "w-16" : "w-64",
         )}
       >
