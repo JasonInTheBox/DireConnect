@@ -36,6 +36,7 @@ export function Dialog({
     }
     if (open && !element.open) {
       element.showModal();
+      element.querySelector<HTMLElement>("[data-autofocus]")?.focus();
     } else if (!open && element.open) {
       element.close();
     }

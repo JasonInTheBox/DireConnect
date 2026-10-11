@@ -92,7 +92,8 @@ function CreateBusinessForm({ onDone }: { onDone: () => void }) {
       <TextField
         label="Business name"
         required
-        autoFocus
+        // React autoFocus fires while the native dialog is still closed; Dialog focuses [data-autofocus] after showModal().
+        data-autofocus="true"
         autoComplete="organization"
         value={values.name}
         onChange={update("name")}
