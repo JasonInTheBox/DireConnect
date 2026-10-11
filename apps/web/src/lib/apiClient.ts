@@ -97,7 +97,11 @@ export async function apiFetch<T = unknown>(
 
     try {
       return (await response.json()) as T;
-    } catch {
+    } catch (error) {
+      if (controller.signal.aborted) {
+        // A timeout or caller cancellation during the body read: let the outer catch classify it.
+        throw error;
+      }
       throw new ApiError(response.status, "The server sent an unexpected response.");
     }
   } catch (error) {

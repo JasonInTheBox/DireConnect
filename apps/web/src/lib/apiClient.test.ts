@@ -181,6 +181,51 @@ describe("apiFetch", () => {
     await assertion;
     await expect(pending).rejects.not.toBeInstanceOf(ApiError);
   });
+
+  function pendingBodyFetch() {
+    fetchMock.mockImplementation(
+      (_url: string, init: RequestInit) =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            new Promise((_resolve, reject) => {
+              init.signal?.addEventListener("abort", () =>
+                reject(new DOMException("Aborted", "AbortError")),
+              );
+            }),
+        }),
+    );
+  }
+
+  it("lets a caller cancellation during the body read propagate as an AbortError", async () => {
+    signedIn();
+    pendingBodyFetch();
+    const controller = new AbortController();
+
+    const pending = apiFetch("/api/businesses", { signal: controller.signal });
+    const assertion = expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    controller.abort();
+    await assertion;
+    await expect(pending).rejects.not.toBeInstanceOf(ApiError);
+  });
+
+  it("reports a slow server when the timeout fires during the body read", async () => {
+    vi.useFakeTimers();
+    signedIn();
+    pendingBodyFetch();
+
+    const pending = apiFetch("/api/businesses");
+    const assertion = expect(pending).rejects.toMatchObject({
+      name: "ApiError",
+      status: 0,
+      message: "The server took too long to respond. Try again in a moment.",
+    });
+
+    await vi.advanceTimersByTimeAsync(API_TIMEOUT_MS);
+    await assertion;
+  });
 });
 
 describe("fieldErrorsFromApiError", () => {
