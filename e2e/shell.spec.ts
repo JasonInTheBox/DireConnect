@@ -105,6 +105,21 @@ test.describe("signed in", () => {
     await expect(page.getByRole("button", { name: /Managing Night Market/ })).toBeVisible();
   });
 
+  test("a business created on the legacy Businesses page is known to the shell", async ({ page }) => {
+    await mockApi(page, { businesses: [bakery] });
+    await page.goto("/businesses");
+
+    await page.getByPlaceholder("Business name").fill("Night Market");
+    await page.getByRole("button", { name: "Add Business", exact: true }).click();
+
+    const card = page.getByRole("listitem").filter({ hasText: "Night Market" });
+    await card.getByRole("link", { name: "View Dashboard" }).click();
+
+    await expect(page).toHaveURL(/\/businesses\/new-1\/dashboard$/);
+    await expect(page.getByRole("heading", { name: "Business not found" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Managing Night Market/ })).toBeVisible();
+  });
+
   test("a slow API shows the waking-up notice instead of an error", async ({ page }) => {
     // The notice appears after 4s and the response arrives at 6s, leaving a 2s window.
     await mockApi(page, { businesses: [bakery], delayMs: 6_000 });
@@ -151,5 +166,25 @@ test.describe("on a phone", () => {
     await page.keyboard.press("Escape");
     await expect(drawer).toBeHidden();
     await expect(opener).toBeFocused();
+  });
+
+  test("Escape closes the business menu inside the drawer before the drawer", async ({ page }) => {
+    await signIn(page);
+    await mockApi(page, { businesses: [bakery, florist] });
+    await page.goto("/businesses/b1/dashboard");
+
+    await page.getByRole("button", { name: "Open navigation" }).click();
+    const drawer = page.getByRole("dialog", { name: "Navigation" });
+    const switcher = drawer.getByRole("button", { name: /Managing Corner Bakery/ });
+    await switcher.click();
+    await expect(page.getByRole("menu")).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toBeHidden();
+    await expect(drawer).toBeVisible();
+    await expect(switcher).toBeFocused();
+
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
   });
 });
