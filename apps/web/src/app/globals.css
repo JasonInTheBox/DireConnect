@@ -1,26 +1,97 @@
 @import "tailwindcss";
 
+/* Design tokens. Light is the default; dark follows the OS setting. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --canvas: #f6f7f8;
+  --surface: #ffffff;
+  --sunken: #eef0f2;
+  --line: #e3e6ea;
+  --line-strong: #cbd1d8;
+  --ink: #14181f;
+  --muted: #5b6572;
+  --accent: #0b6e73;
+  --accent-hover: #095a5e;
+  --accent-ink: #ffffff;
+  --accent-soft: #e2f1f1;
+  --success: #17703f;
+  --success-soft: #e4f4eb;
+  --warning: #8a5b00;
+  --warning-soft: #fbf1d9;
+  --danger: #c02a2a;
+  --danger-soft: #fbe7e7;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --canvas: #0e1113;
+    --surface: #15191c;
+    --sunken: #0b0d0f;
+    --line: #262c31;
+    --line-strong: #3a424a;
+    --ink: #e8ebed;
+    --muted: #98a2ab;
+    --accent: #4db6bc;
+    --accent-hover: #6cc7cc;
+    --accent-ink: #06292b;
+    --accent-soft: #12292b;
+    --success: #5bc58a;
+    --success-soft: #12281c;
+    --warning: #e0b04a;
+    --warning-soft: #2b2310;
+    --danger: #f08080;
+    --danger-soft: #2e1616;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --radius-control: 6px;
+  --radius-container: 10px;
+
+  --shadow-float: 0 8px 24px rgb(20 24 31 / 0.14), 0 1px 3px rgb(20 24 31 / 0.1);
+}
+
+@layer base {
+  body {
+    background: var(--canvas);
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
