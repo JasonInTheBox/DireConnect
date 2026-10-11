@@ -176,7 +176,7 @@ Semantic landmarks and heading order; skip link; visible focus rings on all inte
 
 ## 10. Delivery phases (each shippable)
 
-1. Tokens, primitives, data layer, shell, business switcher, auth layouts, landing fix.
+1. Tokens, data layer, the primitives the shell needs (Button, Field, Dialog, Menu, Toast, Skeleton, EmptyState/ErrorState, Icon), app shell, business switcher, auth pages, landing fix. Remaining primitives (Select, Checkbox, ConfirmDialog, Table, Tabs, Badge/StatusBadge, PageHeader, Breadcrumbs) are added in the phase that first uses them.
 2. Businesses and Customers pages.
 3. Dashboard.
 4. Campaign list and wizard.
