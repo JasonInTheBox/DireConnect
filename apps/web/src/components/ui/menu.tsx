@@ -182,7 +182,7 @@ export function Menu({ items, trigger, align = "start" }: MenuProps) {
                 tabIndex={-1}
                 onClick={() => selectItem(item)}
                 onMouseEnter={() => setActiveIndex(index)}
-                className="flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left text-sm text-ink transition-colors hover:bg-sunken focus:bg-sunken"
+                className="flex w-full items-center gap-2.5 min-h-10 rounded-control px-2.5 py-1.5 text-left text-sm text-ink transition-colors hover:bg-sunken focus:bg-sunken lg:min-h-9"
               >
                 {item.icon}
                 <span className="min-w-0 flex-1 truncate">{item.label}</span>
