@@ -43,10 +43,12 @@ function NavGroup({
             aria-label={collapsed ? entry.label : undefined}
             title={collapsed ? entry.label : undefined}
             className={cn(
-              "flex items-center rounded-control text-sm font-medium transition-colors",
+              "relative flex items-center rounded-control text-sm font-medium transition-colors",
               "h-10 lg:h-9",
               collapsed ? "justify-center" : "gap-2.5 px-2.5",
-              active ? "bg-accent-soft text-accent" : "text-ink hover:bg-sunken",
+              active
+                ? "bg-accent-soft font-semibold text-accent before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-accent"
+                : "text-ink hover:bg-sunken",
             )}
           >
             <Icon name={entry.icon} />
@@ -84,7 +86,10 @@ export function Sidebar({
     : [];
 
   async function handleLogout() {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      await supabase.auth.signOut({ scope: "local" });
+    }
     router.replace("/login");
   }
 

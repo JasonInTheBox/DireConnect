@@ -32,7 +32,7 @@ export function BusinessSwitcher({
       : status === "error"
         ? "Couldn’t load businesses"
         : businesses.length > 0
-          ? "Choose a business"
+          ? "Select a business"
           : "Create your first business");
 
   const items: MenuItem[] = [

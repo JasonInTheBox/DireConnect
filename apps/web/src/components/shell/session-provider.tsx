@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, Fragment, useContext, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toSessionUser, type SessionUser } from "@/lib/session";
@@ -55,7 +55,11 @@ export function SessionProvider({
     return <>{fallback}</>;
   }
 
-  return <SessionContext.Provider value={user}>{children}</SessionContext.Provider>;
+  return (
+    <SessionContext.Provider value={user}>
+      <Fragment key={user.id}>{children}</Fragment>
+    </SessionContext.Provider>
+  );
 }
 
 export function useSession(): SessionUser {

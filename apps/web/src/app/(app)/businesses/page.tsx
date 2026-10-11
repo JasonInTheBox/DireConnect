@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { apiUrl } from "@/lib/api";
 import Link from "next/link";
+import { useBusinesses } from "@/components/shell/businesses-provider";
 
 type Business = {
   id: string;
@@ -17,6 +18,7 @@ type Business = {
 
 export default function BusinessesPage() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
+  const { addBusiness, refetch } = useBusinesses();
   const [editingBusinessId, setEditingBusinessId] = useState<string | null>(null);
 
   const [name, setName] = useState("");
@@ -111,6 +113,13 @@ export default function BusinessesPage() {
       return;
     }
 
+    if (editingBusinessId) {
+      refetch();
+    } else {
+      const created = (await res.json()) as Business;
+      addBusiness(created);
+    }
+
     resetForm();
     fetchBusinesses();
   }
@@ -127,6 +136,7 @@ export default function BusinessesPage() {
     }
 
     setBusinesses((prev) => prev.filter((business) => business.id !== id));
+    refetch();
   }
 
   async function handleLogout() {

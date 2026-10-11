@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { AuthCard } from "@/components/auth/auth-card";
 import { Button } from "@/components/ui/button";
 import { TextField } from "@/components/ui/field";
@@ -20,6 +20,17 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useApiWarmup();
+
+  useEffect(() => {
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (data.session) {
+          router.replace("/businesses");
+        }
+      })
+      .catch(() => undefined);
+  }, [router]);
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

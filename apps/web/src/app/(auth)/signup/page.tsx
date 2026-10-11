@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { AuthCard } from "@/components/auth/auth-card";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { TextField } from "@/components/ui/field";
@@ -21,6 +21,17 @@ export default function SignupPage() {
   const [checkInbox, setCheckInbox] = useState(false);
 
   useApiWarmup();
+
+  useEffect(() => {
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (data.session) {
+          router.replace("/businesses");
+        }
+      })
+      .catch(() => undefined);
+  }, [router]);
 
   async function handleSignup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

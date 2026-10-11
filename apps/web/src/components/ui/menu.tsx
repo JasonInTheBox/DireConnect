@@ -165,7 +165,7 @@ export function Menu({ items, trigger, align = "start" }: MenuProps) {
           aria-labelledby={triggerId}
           onKeyDown={handlePanelKeyDown}
           className={cn(
-            "absolute z-50 mt-1 max-h-80 min-w-64 overflow-auto rounded-container border border-line bg-surface p-1 shadow-float",
+            "absolute z-50 mt-1 max-h-80 min-w-64 max-w-[min(20rem,calc(100vw-2rem))] overflow-auto rounded-container border border-line bg-surface p-1 shadow-float",
             align === "end" ? "right-0" : "left-0",
           )}
         >
