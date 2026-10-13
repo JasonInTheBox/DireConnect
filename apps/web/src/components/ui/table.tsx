@@ -14,7 +14,7 @@ export function Table({ caption, children }: { caption: string; children: ReactN
 }
 
 export function THead({ children }: { children: ReactNode }) {
-  return <thead className="bg-sunken text-muted">{children}</thead>;
+  return <thead className="text-muted">{children}</thead>;
 }
 
 export function TBody({ children }: { children: ReactNode }) {
@@ -22,15 +22,16 @@ export function TBody({ children }: { children: ReactNode }) {
 }
 
 export function Tr({ children }: { children: ReactNode }) {
-  return <tr className="transition-colors hover:bg-sunken">{children}</tr>;
+  return <tr className="group">{children}</tr>;
 }
 
+// 9px = the wrapper's rounded-container (10px) minus its 1px border, so cell backgrounds match the outer corners.
 export function Th({ children, className }: { children?: ReactNode; className?: string }) {
   return (
     <th
       scope="col"
       className={cn(
-        "px-4 py-2.5 font-medium first:rounded-tl-[9px] last:rounded-tr-[9px]",
+        "bg-sunken px-4 py-2.5 font-medium first:rounded-tl-[9px] last:rounded-tr-[9px]",
         className,
       )}
     >
@@ -40,5 +41,14 @@ export function Th({ children, className }: { children?: ReactNode; className?: 
 }
 
 export function Td({ children, className }: { children?: ReactNode; className?: string }) {
-  return <td className={cn("border-t border-line px-4 py-3 align-middle", className)}>{children}</td>;
+  return (
+    <td
+      className={cn(
+        "border-t border-line px-4 py-3 align-middle transition-colors group-hover:bg-sunken [tr:last-child>&:first-child]:rounded-bl-[9px] [tr:last-child>&:last-child]:rounded-br-[9px]",
+        className,
+      )}
+    >
+      {children}
+    </td>
+  );
 }
