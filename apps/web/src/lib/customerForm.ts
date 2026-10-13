@@ -1,3 +1,4 @@
+import { emailConsentOf } from "./customers";
 import type { Customer } from "./types";
 
 export type CustomerFormValues = {
@@ -14,7 +15,7 @@ export function customerFormValues(customer?: Customer | null): CustomerFormValu
     lastName: customer?.lastName ?? "",
     email: customer?.email ?? "",
     phone: customer?.phone ?? "",
-    emailOptIn: customer?.emailOptIn ?? false,
+    emailOptIn: customer ? emailConsentOf(customer) === "opted-in" : false,
   };
 }
 
@@ -42,5 +43,5 @@ export function customerPayload(
 
 /** Ticking consent on someone who is not currently opted in re-subscribes them. */
 export function needsReconsentWarning(customer?: Customer | null): boolean {
-  return Boolean(customer && !(customer.emailOptIn && !customer.unsubscribedAt));
+  return Boolean(customer && emailConsentOf(customer) !== "opted-in");
 }

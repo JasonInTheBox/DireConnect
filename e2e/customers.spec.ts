@@ -79,6 +79,20 @@ test.describe("customers page", () => {
     await expect(page.getByRole("row", { name: /Ada Lovelace/ })).toBeVisible();
   });
 
+  test("a consent filter that hides everyone explains why, not a failed search", async ({ page }) => {
+    await mockApi(page, { businesses: [bakery], customers: { b1: [grace, alan] } });
+    await page.goto("/businesses/b1/customers");
+
+    await page.getByLabel("Filter by consent").selectOption("opted-in");
+    await expect(
+      page.getByRole("heading", { name: "No customers are opted in to email" }),
+    ).toBeVisible();
+    await expect(page.getByText("No customers match your search")).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Clear filters" }).click();
+    await expect(page.getByRole("row", { name: /Grace Hopper/ })).toBeVisible();
+  });
+
   test("an empty business invites the owner to add the first customer", async ({ page }) => {
     await mockApi(page, { businesses: [bakery] });
     await page.goto("/businesses/b1/customers");
@@ -224,6 +238,32 @@ test.describe("customers page", () => {
 
     await page.getByRole("button", { name: "Try again" }).click();
     await expect(page.getByRole("row", { name: /Ada Lovelace/ })).toBeVisible();
+  });
+});
+
+test.describe("customers page on a narrow desktop", () => {
+  test.use({ viewport: { width: 1024, height: 768 } });
+
+  test("keeps the table inside the page when names and emails are long", async ({ page }) => {
+    await signIn(page);
+    const long = customer("c-9", "Bartholomew", {
+      lastName: "Featherstone-Smyth",
+      email: "bartholomew.featherstone@example-company.test",
+      phone: "(555) 123-4567",
+      emailOptIn: true,
+      smsOptIn: true,
+    });
+    expect(long.email).toHaveLength(45);
+    expect(`${long.firstName} ${long.lastName}`).toHaveLength(30);
+    await mockApi(page, { businesses: [bakery], customers: { b1: [long, ada] } });
+    await page.goto("/businesses/b1/customers");
+
+    await expect(page.getByRole("table")).toBeVisible();
+    await expect(page.getByRole("row", { name: /Bartholomew/ })).toBeVisible();
+    const fits = await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    );
+    expect(fits).toBe(true);
   });
 });
 

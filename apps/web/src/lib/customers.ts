@@ -34,6 +34,8 @@ export function filterCustomers(
 ): Customer[] {
   const needle = query.trim().toLowerCase();
   const needleDigits = digitsOf(needle);
+  // Only a phone-looking query ("(555) 123", "555-0100") also searches phone digits; "ada 555" does not.
+  const searchesPhone = /^[\d\s().+-]+$/.test(needle) && needleDigits.length >= 3;
 
   return customers.filter((customer) => {
     if (filter !== "all" && emailConsentOf(customer) !== filter) {
@@ -50,7 +52,7 @@ export function filterCustomers(
     }
 
     // Phone numbers are stored as typed, so compare digits only (and ignore 1-2 digit queries).
-    return needleDigits.length >= 3 && digitsOf(customer.phone ?? "").includes(needleDigits);
+    return searchesPhone && digitsOf(customer.phone ?? "").includes(needleDigits);
   });
 }
 

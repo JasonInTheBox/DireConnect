@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CustomerFormDialog } from "@/components/customers/customer-form-dialog";
 import { CustomerTable } from "@/components/customers/customer-table";
 import { CustomersToolbar } from "@/components/customers/customers-toolbar";
@@ -31,6 +31,26 @@ export default function CustomersPage() {
   return <CustomersView key={businessId} businessId={businessId} />;
 }
 
+/** Says why the list is empty: a search that found nothing, or only the consent filter hiding everyone. */
+function noMatchCopy(query: string, filter: ConsentFilter): { title: string; description: string } {
+  if (!query.trim() && filter === "opted-in") {
+    return {
+      title: "No customers are opted in to email",
+      description: "Customers appear here once they’ve agreed to receive your emails.",
+    };
+  }
+  if (!query.trim() && filter === "not-opted-in") {
+    return {
+      title: "Everyone is opted in to email",
+      description: "Every customer has agreed to receive your emails.",
+    };
+  }
+  return {
+    title: "No customers match your search",
+    description: "Try a different name, email or phone number.",
+  };
+}
+
 function CustomersView({ businessId }: { businessId: string }) {
   const { businesses } = useBusinesses();
   const toast = useToast();
@@ -46,9 +66,20 @@ function CustomersView({ businessId }: { businessId: string }) {
   const [editing, setEditing] = useState<Customer | null>(null);
   const [deleting, setDeleting] = useState<Customer | null>(null);
 
+  // An emptied list must not leave an old search or filter hiding the next customer added.
+  const listEmpty = data !== null && data.length === 0;
+  useEffect(() => {
+    if (listEmpty) {
+      setQuery("");
+      setFilter("all");
+      setPage(1);
+    }
+  }, [listEmpty]);
+
   const customers = data ?? [];
   const filtered = filterCustomers(customers, query, filter);
   const visible = paginate(filtered, page);
+  const noMatch = noMatchCopy(query, filter);
 
   function changeQuery(next: string) {
     setQuery(next);
@@ -111,8 +142,8 @@ function CustomersView({ businessId }: { businessId: string }) {
           {filtered.length === 0 ? (
             <EmptyState
               icon="search"
-              title="No customers match your search"
-              description="Try a different name, email or phone number."
+              title={noMatch.title}
+              description={noMatch.description}
               action={<Button onClick={clearFilters}>Clear filters</Button>}
             />
           ) : (

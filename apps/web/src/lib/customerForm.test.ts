@@ -42,6 +42,19 @@ describe("customerFormValues", () => {
   });
 });
 
+describe("customerFormValues consent", () => {
+  it("does not pre-tick consent for someone who unsubscribed", () => {
+    const unsubscribed = { ...existing, emailOptIn: true, unsubscribedAt: "2026-09-01T00:00:00Z" };
+    expect(customerFormValues(unsubscribed).emailOptIn).toBe(false);
+    expect(needsReconsentWarning(unsubscribed)).toBe(true);
+  });
+
+  it("pre-ticks consent for a currently opted-in customer", () => {
+    const optedIn = { ...existing, emailOptIn: true, unsubscribedAt: null };
+    expect(customerFormValues(optedIn).emailOptIn).toBe(true);
+  });
+});
+
 describe("validateCustomerForm", () => {
   const valid = customerFormValues(existing);
 

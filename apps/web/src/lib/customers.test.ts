@@ -81,6 +81,27 @@ describe("filterCustomers", () => {
     expect(filterCustomers(all, "555 987", "all")).toEqual([grace]);
   });
 
+  it("treats formatted phone-looking queries as phone searches", () => {
+    expect(filterCustomers(all, "(555)", "all")).toEqual(all);
+    const local = customer({ id: "c4", firstName: "Lin", lastName: null, email: null, phone: "(555) 010-0100" });
+    expect(filterCustomers([ada, local], "555-0100", "all")).toEqual([local]);
+    expect(filterCustomers(all, "(555) 123-4567", "all")).toEqual([ada]);
+    expect(filterCustomers(all, "555-987", "all")).toEqual([grace]);
+  });
+
+  it("does not match a mixed query through phone digits alone", () => {
+    const bob = customer({
+      id: "c3",
+      firstName: "Bob",
+      lastName: "Smith",
+      email: "bob@example.com",
+      phone: "555-202-4000",
+    });
+    expect(filterCustomers([ada, bob], "ada 555", "all")).toEqual([]);
+    expect(filterCustomers([ada, bob], "bob2024@", "all")).toEqual([]);
+    expect(filterCustomers([ada, bob], "2024", "all")).toEqual([bob]);
+  });
+
   it("does not treat one or two digits as a phone search", () => {
     expect(filterCustomers(all, "55", "all")).toEqual([]);
   });
