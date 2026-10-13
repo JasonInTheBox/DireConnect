@@ -67,7 +67,7 @@ function RowActions({ customer, onEdit, onDelete }: { customer: Customer } & Han
 }
 
 function Truncated({ children }: { children: ReactNode }) {
-  return <div className="max-w-[16rem] truncate">{children}</div>;
+  return <div className="min-w-0 truncate">{children}</div>;
 }
 
 /** A table from `lg` up; stacked cards below, where a table would be cramped. */
@@ -79,14 +79,14 @@ export function CustomerTable({
   return (
     <>
       <div className="hidden lg:block">
-        <Table caption="Customers">
+        <Table caption="Customers" fixed>
           <THead>
             <tr>
-              <Th>Name</Th>
-              <Th>Email</Th>
-              <Th>Phone</Th>
-              <Th>Consent</Th>
-              <Th className="w-14">
+              <Th className="w-[26%]">Name</Th>
+              <Th className="w-[34%]">Email</Th>
+              <Th className="w-36">Phone</Th>
+              <Th className="w-44">Consent</Th>
+              <Th className="w-[4.5rem]">
                 <span className="sr-only">Actions</span>
               </Th>
             </tr>
@@ -94,13 +94,13 @@ export function CustomerTable({
           <TBody>
             {customers.map((customer) => (
               <Tr key={customer.id}>
-                <Td className="font-medium text-ink">
+                <Td className="overflow-hidden font-medium text-ink">
                   <Truncated>{fullName(customer)}</Truncated>
                 </Td>
-                <Td>
+                <Td className="overflow-hidden">
                   <Truncated>{customer.email || <Missing label="No email" />}</Truncated>
                 </Td>
-                <Td>
+                <Td className="overflow-hidden">
                   <Truncated>{customer.phone || <Missing label="No phone" />}</Truncated>
                 </Td>
                 <Td>

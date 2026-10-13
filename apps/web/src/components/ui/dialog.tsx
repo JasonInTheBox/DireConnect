@@ -109,12 +109,12 @@ export function Dialog({
             </h2>
           ) : (
             <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <h2 id={titleId} className="text-base font-semibold">
+              <div className="min-w-0">
+                <h2 id={titleId} className="break-words text-base font-semibold">
                   {title}
                 </h2>
                 {description ? (
-                  <p id={descriptionId} className="mt-1 text-sm text-muted">
+                  <p id={descriptionId} className="mt-1 break-words text-sm text-muted">
                     {description}
                   </p>
                 ) : null}

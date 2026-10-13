@@ -2,10 +2,24 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 // The wrapper deliberately has no `overflow` so row action menus (absolutely positioned) are not clipped.
-export function Table({ caption, children }: { caption: string; children: ReactNode }) {
+// `fixed` lays columns out from the header widths so long cells truncate instead of widening the table.
+export function Table({
+  caption,
+  fixed = false,
+  children,
+}: {
+  caption: string;
+  fixed?: boolean;
+  children: ReactNode;
+}) {
   return (
     <div className="rounded-container border border-line bg-surface">
-      <table className="w-full border-separate border-spacing-0 text-left text-[13px]">
+      <table
+        className={cn(
+          "w-full border-separate border-spacing-0 text-left text-[13px]",
+          fixed && "table-fixed",
+        )}
+      >
         <caption className="sr-only">{caption}</caption>
         {children}
       </table>
