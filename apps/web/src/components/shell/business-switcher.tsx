@@ -7,7 +7,7 @@ import { getBusinessIdFromPath, pathForBusinessSwitch } from "@/lib/navigation";
 import { Icon } from "@/components/ui/icons";
 import { Menu, type MenuItem } from "@/components/ui/menu";
 import { useBusinesses } from "./businesses-provider";
-import { CreateBusinessDialog } from "./create-business-dialog";
+import { BusinessFormDialog } from "./business-form-dialog";
 import { Monogram } from "./monogram";
 
 export function BusinessSwitcher({
@@ -84,7 +84,7 @@ export function BusinessSwitcher({
           </button>
         )}
       />
-      <CreateBusinessDialog open={creating} onClose={() => setCreating(false)} />
+      <BusinessFormDialog open={creating} onClose={() => setCreating(false)} />
     </>
   );
 }

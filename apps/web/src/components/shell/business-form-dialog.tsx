@@ -3,7 +3,8 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, apiFetch, fieldErrorsFromApiError } from "@/lib/apiClient";
-import { focusFirstInvalid } from "@/lib/forms";
+import { businessFormValues, businessPayload, type BusinessFormValues } from "@/lib/businessForm";
+import { focusFirstInvalid, splitFieldErrors } from "@/lib/forms";
 import type { Business } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -12,39 +13,49 @@ import { FormError } from "@/components/ui/state";
 import { useToast } from "@/components/ui/toast";
 import { useBusinesses } from "./businesses-provider";
 
-type FormValues = {
-  name: string;
-  description: string;
-  email: string;
-  phone: string;
-  website: string;
+const FIELDS = ["name", "description", "email", "phone", "website"] as const;
+
+type BusinessFormDialogProps = {
+  open: boolean;
+  onClose: () => void;
+  /** Edit this business. Omit (or pass null) to create a new one. */
+  business?: Business | null;
 };
 
-const EMPTY: FormValues = { name: "", description: "", email: "", phone: "", website: "" };
+export function BusinessFormDialog({ open, onClose, business = null }: BusinessFormDialogProps) {
+  const [busy, setBusy] = useState(false);
 
-export function CreateBusinessDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      title="Create a business"
-      description="Each business has its own customers and campaigns."
+      title={business ? "Edit business" : "Create a business"}
+      description={business ? undefined : "Each business has its own customers and campaigns."}
+      dismissible={!busy}
     >
-      <CreateBusinessForm onDone={onClose} />
+      <BusinessForm business={business} onDone={onClose} onBusyChange={setBusy} />
     </Dialog>
   );
 }
 
-function CreateBusinessForm({ onDone }: { onDone: () => void }) {
+function BusinessForm({
+  business,
+  onDone,
+  onBusyChange,
+}: {
+  business: Business | null;
+  onDone: () => void;
+  onBusyChange: (busy: boolean) => void;
+}) {
   const router = useRouter();
   const toast = useToast();
-  const { addBusiness } = useBusinesses();
-  const [values, setValues] = useState<FormValues>(EMPTY);
+  const { addBusiness, refetch } = useBusinesses();
+  const [values, setValues] = useState<BusinessFormValues>(() => businessFormValues(business));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  function update(field: keyof FormValues) {
+  function update(field: keyof BusinessFormValues) {
     return (event: { target: { value: string } }) =>
       setValues((previous) => ({ ...previous, [field]: event.target.value }));
   }
@@ -52,10 +63,9 @@ function CreateBusinessForm({ onDone }: { onDone: () => void }) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
-    const name = values.name.trim();
 
     setFormError(null);
-    if (!name) {
+    if (!values.name.trim()) {
       setErrors({ name: "Enter a business name." });
       focusFirstInvalid(form);
       return;
@@ -63,27 +73,45 @@ function CreateBusinessForm({ onDone }: { onDone: () => void }) {
 
     setErrors({});
     setSubmitting(true);
+    onBusyChange(true);
     try {
-      const business = await apiFetch<Business>("/api/businesses", {
-        method: "POST",
-        body: { ...values, name },
-      });
-      addBusiness(business);
-      toast.success("Business created");
-      onDone();
-      router.push(`/businesses/${business.id}/dashboard`);
-    } catch (error) {
-      const fieldErrors = fieldErrorsFromApiError(error);
-      if (Object.keys(fieldErrors).length > 0) {
-        setErrors(fieldErrors);
-        focusFirstInvalid(form);
+      const payload = businessPayload(values);
+      if (business) {
+        await apiFetch<Business>(`/api/businesses/${business.id}`, {
+          method: "PUT",
+          body: payload,
+        });
+        refetch();
+        toast.success("Business updated");
+        onDone();
       } else {
+        const created = await apiFetch<Business>("/api/businesses", {
+          method: "POST",
+          body: payload,
+        });
+        addBusiness(created);
+        toast.success("Business created");
+        onDone();
+        router.push(`/businesses/${created.id}/dashboard`);
+      }
+    } catch (error) {
+      const { fields, unmapped } = splitFieldErrors(fieldErrorsFromApiError(error), FIELDS);
+      const hasFieldErrors = Object.keys(fields).length > 0;
+
+      if (hasFieldErrors) {
+        setErrors(fields);
+        focusFirstInvalid(form);
+      }
+      if (unmapped.length > 0) {
+        setFormError(unmapped.join(" "));
+      } else if (!hasFieldErrors) {
         setFormError(
-          error instanceof ApiError ? error.message : "Could not create the business. Try again.",
+          error instanceof ApiError ? error.message : "Could not save the business. Try again.",
         );
       }
     } finally {
       setSubmitting(false);
+      onBusyChange(false);
     }
   }
 
@@ -140,7 +168,7 @@ function CreateBusinessForm({ onDone }: { onDone: () => void }) {
           Cancel
         </Button>
         <Button type="submit" variant="primary" loading={submitting}>
-          Create business
+          {business ? "Save changes" : "Create business"}
         </Button>
       </div>
     </form>
