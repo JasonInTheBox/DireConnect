@@ -16,3 +16,15 @@ export function PageSkeleton({ slow = false }: { slow?: boolean }) {
     </div>
   );
 }
+
+export function ListSkeleton({ rows = 6, slow = false }: { rows?: number; slow?: boolean }) {
+  return (
+    <div role="status" className="space-y-3">
+      <span className="sr-only">Loading</span>
+      {Array.from({ length: rows }, (_, index) => (
+        <Skeleton key={index} className="h-14 w-full" />
+      ))}
+      {slow ? <SlowNotice /> : null}
+    </div>
+  );
+}
