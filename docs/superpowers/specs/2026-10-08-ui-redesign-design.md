@@ -45,6 +45,7 @@ Backend rules the UI must respect (all verified in the code):
 - **Queue-time checks** (`POST .../queue`): in production, 403 "Confirm your account email before sending campaigns." and 403 "Campaign sending is not enabled for this account." (sender allowlist); 409 when zero eligible recipients; 409 when more than 10 eligible recipients (`CAMPAIGN_EMAIL_SAFETY_LIMITS.maxRecipientsPerCampaign`, response includes `eligibleCount` and `maxRecipients`).
 - **Delivery-time limits** (worker, not knowable beforehand): 25 emails per account, 100 per platform, 1 per recipient, each per rolling 24 hours. Blocked recipients appear as FAILED message logs with a human-readable `errorMessage`.
 - **Customers.** New customers default to email opt-out. The consent checkbox wording is "Customer explicitly agreed to receive promotional emails" and must stay explicit and unchecked by default.
+- **Consent cannot distinguish "never opted in" from "unsubscribed".** Creating or editing a customer with no opt-ins stores `unsubscribedAt = now`, and the unsubscribe link sets `emailOptIn=false` plus `unsubscribedAt`. The Customers UI therefore shows two states: "Email opted in" (`emailOptIn && !unsubscribedAt`) and "Email not opted in".
 - **Businesses.** Website input is normalised server-side (a bare domain gets `https://`).
 - **Render free tier** sleeps after 15 minutes idle and can take about a minute to wake. First requests after idle are slow, not broken.
 - **Worker offline.** Queued or scheduled campaigns wait until the worker runs.
@@ -137,7 +138,7 @@ Tables scroll horizontally in their container; the customer table collapses to s
 
 **Businesses.** Two-column card grid: monogram, name, clamped description, contact line, **Open**; menu with Edit and Delete (delete requires typing the business name; deletion cascades to customers and campaigns). Current business marked. "New business" opens the shared create/edit dialog. Empty state with a create action.
 
-**Customers.** Toolbar: search (name, email, phone), consent filter (All, Email opted in, Not opted in, Unsubscribed), count, **Add customer**. Add/Edit share a dialog. Columns: Name, Email, Phone, Email consent badge (Opted in / Not opted in / Unsubscribed), row menu (Edit, Delete with confirm). The form's email consent checkbox is unchecked by default, keeps the wording "Customer explicitly agreed to receive promotional emails", and has helper text explaining that only customers who agreed can receive campaigns. SMS consent is not a primary control (SMS is paused): the form passes the existing `smsOptIn` value through unchanged on edit so it is never overwritten, and a small "SMS opted in" badge appears only for customers who have it. Client-side pagination beyond 50 rows. Empty states: first customer; no search matches. Skeleton while loading; ErrorState with Retry.
+**Customers.** Toolbar: search (name, email, phone), consent filter (All customers, Opted in to email, Not opted in), count, **Add customer**. Add/Edit share a dialog. Columns: Name, Email, Phone, Email consent badge (Email opted in / Email not opted in), row menu (Edit, Delete with confirm). The form's email consent checkbox is unchecked by default, keeps the wording "Customer explicitly agreed to receive promotional emails", and has helper text explaining that only customers who agreed can receive campaigns. SMS consent is not a primary control (SMS is paused): the form passes the existing `smsOptIn` value through unchanged on edit so it is never overwritten, and a small "SMS opted in" badge appears only for customers who have it. Client-side pagination beyond 50 rows. Empty states: first customer; no search matches. Skeleton while loading; ErrorState with Retry.
 
 **Dashboard.** Built only from `/dashboard` data. Header with quick actions (Add customer, New campaign). Setup checklist shown only while applicable (add first customer, send first campaign), driven by real counts. Panels: Customers (total plus email opt-in, SMS opt-in, unsubscribed breakdown); Delivery (sent/failed/pending as one stacked bar and the success rate, or "No messages sent yet"); Campaigns (status breakdown); Recent campaigns table. No trend charts. Business details moved to the Businesses page, with an edit link.
 
@@ -177,7 +178,7 @@ Semantic landmarks and heading order; skip link; visible focus rings on all inte
 ## 10. Delivery phases (each shippable)
 
 1. Tokens, data layer, the primitives the shell needs (Button, Field, Dialog, Menu, Toast, Skeleton, EmptyState/ErrorState, Icon), app shell, business switcher, auth pages, landing fix. Remaining primitives (Select, Checkbox, ConfirmDialog, Table, Tabs, Badge/StatusBadge, PageHeader, Breadcrumbs) are added in the phase that first uses them.
-2. Businesses and Customers pages.
+2. Businesses and Customers pages. The customer table appears at lg and above and stacks into cards below; the Businesses page reads the shared businesses list.
 3. Dashboard.
 4. Campaign list and wizard.
 5. Campaign detail tabs and Account page.

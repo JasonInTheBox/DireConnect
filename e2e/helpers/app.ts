@@ -16,6 +16,40 @@ export function business(id: string, name: string): MockBusiness {
   return { id, ownerId: "user-1", name, description: null, email: null, phone: null, website: null };
 }
 
+export type MockCustomer = {
+  id: string;
+  ownerId: string;
+  businessId: string;
+  firstName: string;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  emailOptIn: boolean;
+  smsOptIn: boolean;
+  unsubscribedAt: string | null;
+};
+
+export function customer(
+  id: string,
+  firstName: string,
+  overrides: Partial<MockCustomer> = {},
+  businessId = "b1",
+): MockCustomer {
+  return {
+    id,
+    ownerId: "user-1",
+    businessId,
+    firstName,
+    lastName: null,
+    email: null,
+    phone: null,
+    emailOptIn: false,
+    smsOptIn: false,
+    unsubscribedAt: null,
+    ...overrides,
+  };
+}
+
 /** Seeds a signed-in Supabase session; the client reads it locally and does not verify it. */
 export async function signIn(page: Page) {
   await page.addInitScript(() => {
@@ -41,10 +75,18 @@ export async function signIn(page: Page) {
   });
 }
 
+export type RecordedRequest = { method: string; path: string; body: unknown };
+
 type ApiMockOptions = {
   businesses: MockBusiness[];
+  /** Customers per business id. */
+  customers?: Record<string, MockCustomer[]>;
   /** Delays every non-preflight API response, to simulate a sleeping server. */
   delayMs?: number;
+  /** Delays only writes (POST/PUT/DELETE), to hold a request in flight. */
+  delayWritesMs?: number;
+  /** Makes the first customers list request fail with a 500. */
+  failFirstCustomersGet?: boolean;
 };
 
 function emptyDashboard(target: MockBusiness) {
@@ -59,8 +101,21 @@ function emptyDashboard(target: MockBusiness) {
   };
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function mockApi(page: Page, options: ApiMockOptions) {
-  const state = { businesses: [...options.businesses], created: [] as Array<Record<string, unknown>> };
+  const state = {
+    businesses: [...options.businesses],
+    customers: Object.fromEntries(
+      Object.entries(options.customers ?? {}).map(([id, list]) => [id, [...list]]),
+    ) as Record<string, MockCustomer[]>,
+    created: [] as Array<Record<string, unknown>>,
+    requests: [] as RecordedRequest[],
+    nextCustomerId: 1000,
+    customersGetFailed: false,
+  };
 
   // The Supabase client may try to reach its (fake) host; keep it quiet and offline.
   await page.route("https://example.supabase.co/**", (route) =>
@@ -77,13 +132,21 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
     };
     const json = (status: number, body: unknown) =>
       route.fulfill({ status, headers: cors, contentType: "application/json", body: JSON.stringify(body) });
+    const noContent = () => route.fulfill({ status: 204, headers: cors });
 
     if (request.method() === "OPTIONS") {
       return route.fulfill({ status: 204, headers: cors });
     }
 
+    const rawBody = request.postData();
+    const body = (rawBody ? JSON.parse(rawBody) : undefined) as Record<string, unknown> | undefined;
+    state.requests.push({ method: request.method(), path: url.pathname, body });
+
     if (options.delayMs) {
-      await new Promise((resolve) => setTimeout(resolve, options.delayMs));
+      await sleep(options.delayMs);
+    }
+    if (options.delayWritesMs && request.method() !== "GET") {
+      await sleep(options.delayWritesMs);
     }
 
     if (url.pathname === "/health") {
@@ -95,17 +158,31 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
     }
 
     if (url.pathname === "/api/businesses" && request.method() === "POST") {
-      const body = request.postDataJSON() as Record<string, unknown>;
-      if (body.email === "bad") {
+      if (body?.email === "bad") {
         return json(400, {
           error: "Invalid request body",
           details: [{ path: ["email"], message: "Invalid email" }],
         });
       }
-      state.created.push(body);
-      const created = business(`new-${state.created.length}`, String(body.name));
+      state.created.push(body ?? {});
+      const created = business(`new-${state.created.length}`, String(body?.name));
       state.businesses.push(created);
       return json(201, created);
+    }
+
+    const businessRoute = url.pathname.match(/^\/api\/businesses\/([^/]+)$/);
+    if (businessRoute && request.method() === "PUT") {
+      const index = state.businesses.findIndex((candidate) => candidate.id === businessRoute[1]);
+      if (index === -1) {
+        return json(404, { error: "Business not found" });
+      }
+      const updated = { ...state.businesses[index], ...body } as MockBusiness;
+      state.businesses[index] = updated;
+      return json(200, updated);
+    }
+    if (businessRoute && request.method() === "DELETE") {
+      state.businesses = state.businesses.filter((candidate) => candidate.id !== businessRoute[1]);
+      return noContent();
     }
 
     const dashboard = url.pathname.match(/^\/api\/businesses\/([^/]+)\/dashboard$/);
@@ -114,7 +191,72 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
       return match ? json(200, emptyDashboard(match)) : json(404, { error: "Business not found" });
     }
 
-    if (/^\/api\/businesses\/[^/]+\/(customers|campaigns)$/.test(url.pathname)) {
+    const customerRoute = url.pathname.match(/^\/api\/businesses\/([^/]+)\/customers(?:\/([^/]+))?$/);
+    if (customerRoute) {
+      const [, businessId, customerId] = customerRoute;
+      const list = (state.customers[businessId] ??= []);
+
+      if (request.method() === "GET" && !customerId) {
+        if (options.failFirstCustomersGet && !state.customersGetFailed) {
+          state.customersGetFailed = true;
+          return json(500, { error: "Database unavailable" });
+        }
+        return json(200, list);
+      }
+
+      if (request.method() === "POST" && !customerId) {
+        if (body?.email === "bad") {
+          return json(400, {
+            error: "Invalid request body",
+            details: [{ path: ["email"], message: "Invalid email" }],
+          });
+        }
+        const subscribed = Boolean(body?.emailOptIn) || Boolean(body?.smsOptIn);
+        const created = customer(
+          `c-${state.nextCustomerId++}`,
+          String(body?.firstName),
+          {
+            lastName: (body?.lastName as string) || null,
+            email: (body?.email as string) || null,
+            phone: (body?.phone as string) || null,
+            emailOptIn: Boolean(body?.emailOptIn),
+            smsOptIn: Boolean(body?.smsOptIn),
+            // Mirrors the API: no opt-in at all is stored as unsubscribed.
+            unsubscribedAt: subscribed ? null : new Date().toISOString(),
+          },
+          businessId,
+        );
+        list.unshift(created);
+        return json(201, created);
+      }
+
+      if (request.method() === "PUT" && customerId) {
+        const index = list.findIndex((candidate) => candidate.id === customerId);
+        if (index === -1) {
+          return json(404, { error: "Customer not found" });
+        }
+        const subscribed = Boolean(body?.emailOptIn) || Boolean(body?.smsOptIn);
+        const updated: MockCustomer = {
+          ...list[index],
+          firstName: String(body?.firstName),
+          lastName: (body?.lastName as string) || null,
+          email: (body?.email as string) || null,
+          phone: (body?.phone as string) || null,
+          emailOptIn: Boolean(body?.emailOptIn),
+          smsOptIn: Boolean(body?.smsOptIn),
+          unsubscribedAt: subscribed ? null : new Date().toISOString(),
+        };
+        list[index] = updated;
+        return json(200, updated);
+      }
+
+      if (request.method() === "DELETE" && customerId) {
+        state.customers[businessId] = list.filter((candidate) => candidate.id !== customerId);
+        return noContent();
+      }
+    }
+
+    if (/^\/api\/businesses\/[^/]+\/campaigns$/.test(url.pathname)) {
       return json(200, []);
     }
 
