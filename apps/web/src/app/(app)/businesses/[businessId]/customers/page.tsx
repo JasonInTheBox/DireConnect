@@ -1,348 +1,166 @@
-"use client"
+"use client";
 
-import Link from "next/link";
-import { use, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { apiUrl } from "@/lib/api";
+import { useParams } from "next/navigation";
+import { useState } from "react";
+import { CustomerFormDialog } from "@/components/customers/customer-form-dialog";
+import { CustomerTable } from "@/components/customers/customer-table";
+import { CustomersToolbar } from "@/components/customers/customers-toolbar";
+import { useBusinesses } from "@/components/shell/businesses-provider";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Icon } from "@/components/ui/icons";
+import { PageContainer, PageHeader } from "@/components/ui/page-header";
+import { Pagination } from "@/components/ui/pagination";
+import { ListSkeleton } from "@/components/ui/skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/state";
+import { useToast } from "@/components/ui/toast";
+import { apiFetch } from "@/lib/apiClient";
+import {
+  customerCountLabel,
+  filterCustomers,
+  fullName,
+  paginate,
+  type ConsentFilter,
+} from "@/lib/customers";
+import type { Customer } from "@/lib/types";
+import { useApi } from "@/lib/useApi";
 
-type Customer = {
-    id: string;
-    ownerId: string;
-    businessId: string;
-    firstName: string;
-    lastName?: string | null;
-    email?: string | null;
-    phone?: string | null;
-    emailOptIn: boolean;
-    smsOptIn: boolean;
-    unsubscribedAt?: string | null;
-};
+export default function CustomersPage() {
+  const { businessId } = useParams<{ businessId: string }>();
+  // Keyed so search, filter, page and open dialogs reset when the business changes.
+  return <CustomersView key={businessId} businessId={businessId} />;
+}
 
-type PageProps = {
-    params: Promise<{
-        businessId: string;
-    }>;
-};
+function CustomersView({ businessId }: { businessId: string }) {
+  const { businesses } = useBusinesses();
+  const toast = useToast();
+  const businessName = businesses.find((business) => business.id === businessId)?.name ?? "Business";
+  const { data, error, slow, refetch } = useApi<Customer[]>(
+    `/api/businesses/${businessId}/customers`,
+  );
 
-export default function BusinessCustomersPage({ params }: PageProps) {
-    const { businessId } = use(params);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<ConsentFilter>("all");
+  const [page, setPage] = useState(1);
+  const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<Customer | null>(null);
+  const [deleting, setDeleting] = useState<Customer | null>(null);
 
-    const [customers, setCustomers] = useState<Customer[]>([]);
-    const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
+  const customers = data ?? [];
+  const filtered = filterCustomers(customers, query, filter);
+  const visible = paginate(filtered, page);
 
-    const [firstName, setFirstName] = useState("");
-    const [lastName, setLastName] = useState("");
-    const [email, setEmail] = useState("");
-    const [phone, setPhone] = useState("");
-
-    const [emailOptIn, setEmailOptIn] = useState(false);
-    const [smsOptIn, setSmsOptIn] = useState(false);
-
-    async function getAuthHeaders() {
-        const {
-            data: { session },
-        } = await supabase.auth.getSession();
-
-        return {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session?.access_token ?? ""}`,
-        };
-    }
-
-
-    async function fetchCustomers() {
-        const {
-            data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session) {
-            window.location.href = "/login";
-            return;
-        }
-
-        const res = await fetch(apiUrl(`/api/businesses/${businessId}/customers`), {
-            headers: {
-                Authorization: `Bearer ${session.access_token}`,
-            },
-        });
-
-        if (!res.ok) {
-            const errorData = await res.json().catch(() => null);
-            alert(errorData?.error || `Failed to fetch customers. Status: ${res.status}`);
-            return;
-        }
-
-        const data = await res.json();
-        setCustomers(data);
-    };
-
-    useEffect(() => {
-        fetchCustomers();
-    }, []);
-
-    function resetForm() {
-      setEditingCustomerId(null);
-      setFirstName("");
-      setLastName("");
-      setEmail("");
-      setPhone("");
-      setEmailOptIn(false);
-      setSmsOptIn(false);
-    }
-
-  function handleEdit(customer: Customer) {
-    setEditingCustomerId(customer.id);
-    setFirstName(customer.firstName);
-    setLastName(customer.lastName || "");
-    setEmail(customer.email || "");
-    setPhone(customer.phone || "");
-    setEmailOptIn(customer.emailOptIn ?? false);
-    setSmsOptIn(customer.smsOptIn ?? false);
+  function changeQuery(next: string) {
+    setQuery(next);
+    setPage(1);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-
-    const customerData = {
-      firstName,
-      lastName,
-      email,
-      phone,
-      emailOptIn,
-      smsOptIn,
-    };
-
-    const url = editingCustomerId
-      ? apiUrl(`/api/businesses/${businessId}/customers/${editingCustomerId}`)
-      : apiUrl(`/api/businesses/${businessId}/customers`);
-
-    const method = editingCustomerId ? "PUT" : "POST";
-
-    const res = await fetch(url, {
-      method,
-      headers: await getAuthHeaders(),
-      body: JSON.stringify(customerData),
-    });
-
-    if (!res.ok) {
-      alert(editingCustomerId ? "Failed to update customer" : "Failed to create customer");
-      return;
-    }
-
-    resetForm();
-    fetchCustomers();
+  function changeFilter(next: ConsentFilter) {
+    setFilter(next);
+    setPage(1);
   }
 
-  async function handleDelete(id: string) {
-    const res = await fetch(
-      apiUrl(`/api/businesses/${businessId}/customers/${id}`),
-      {
-        method: "DELETE",
-        headers: await getAuthHeaders(),
-      }
-    );
-
-    if (!res.ok) {
-      alert("Failed to delete customer");
-      return;
-    }
-
-    setCustomers((prev) => prev.filter((customer) => customer.id !== id));
-  }
-
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    window.location.href = "/login";
+  function clearFilters() {
+    setQuery("");
+    setFilter("all");
+    setPage(1);
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 px-6 py-8 text-gray-100">
-      <div className="mx-auto max-w-5xl">
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              Business Customers
-            </h1>
-            <p className="mt-2 text-gray-400">
-              Manage customers for this selected business.
-            </p>
-          </div>
+    <PageContainer>
+      <PageHeader
+        breadcrumbs={[
+          { label: "Businesses", href: "/businesses" },
+          { label: businessName, href: `/businesses/${businessId}/dashboard` },
+          { label: "Customers" },
+        ]}
+        title="Customers"
+        description="The people you keep in touch with. Only customers who agreed to receive emails are included in campaigns."
+        actions={
+          <Button variant="primary" onClick={() => setCreating(true)}>
+            <Icon name="plus" />
+            Add customer
+          </Button>
+        }
+      />
 
-          <button
-            onClick={handleLogout}
-            className="rounded-lg bg-gray-800 px-4 py-2 font-medium text-gray-100 hover:bg-gray-700"
-          >
-            Log out
-          </button>
-        </div>
-
-        <div className="mb-6">
-          <Link
-            href="/businesses"
-            className="text-sm font-medium text-blue-400 hover:underline"
-          >
-            ← Back to Businesses
-          </Link>
-        </div>
-
-        <section className="mb-8 rounded-xl border border-gray-800 bg-gray-900 p-6 shadow-sm">
-          <h2 className="mb-4 text-xl font-semibold">
-            {editingCustomerId ? "Edit Customer" : "Add Customer"}
-          </h2>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <input
-                className="w-full rounded-lg border border-gray-700 bg-gray-950 px-4 py-2 text-gray-100 outline-none placeholder:text-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-900"
-                placeholder="First name"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-              />
-
-              <input
-                className="w-full rounded-lg border border-gray-700 bg-gray-950 px-4 py-2 text-gray-100 outline-none placeholder:text-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-900"
-                placeholder="Last name"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-              />
-
-              <input
-                className="w-full rounded-lg border border-gray-700 bg-gray-950 px-4 py-2 text-gray-100 outline-none placeholder:text-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-900"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-
-              <input
-                className="w-full rounded-lg border border-gray-700 bg-gray-950 px-4 py-2 text-gray-100 outline-none placeholder:text-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-900"
-                placeholder="Phone"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
-            </div>
-
-            <div className="flex flex-wrap gap-4 rounded-lg border border-gray-800 bg-gray-950 p-4">
-              <label className="flex items-center gap-2 text-sm text-gray-300">
-                <input
-                  type="checkbox"
-                  checked={emailOptIn}
-                  onChange={(e) => setEmailOptIn(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-700 bg-gray-900"
-                />
-                Customer explicitly agreed to receive promotional emails
-              </label>
-
-              <label className="flex items-center gap-2 text-sm text-gray-300">
-                <input
-                  type="checkbox"
-                  checked={smsOptIn}
-                  onChange={(e) => setSmsOptIn(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-700 bg-gray-900"
-                />
-                SMS opt-in
-              </label>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <button
-                className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
-                type="submit"
-              >
-                {editingCustomerId ? "Update Customer" : "Add Customer"}
-              </button>
-
-              {editingCustomerId && (
-                <button
-                  className="rounded-lg bg-gray-800 px-4 py-2 font-semibold text-gray-100 hover:bg-gray-700"
-                  type="button"
-                  onClick={resetForm}
-                >
-                  Cancel Edit
-                </button>
-              )}
-            </div>
-          </form>
-        </section>
-
-        <section>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Customers</h2>
-            <span className="text-sm text-gray-400">
-              {customers.length} total
-            </span>
-          </div>
-
-          {customers.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-700 bg-gray-900 p-8 text-center text-gray-400">
-              No customers yet. Add your first customer above.
-            </div>
+      {data === null && error === null ? (
+        <ListSkeleton slow={slow} />
+      ) : data === null && error ? (
+        <ErrorState title="Couldn’t load customers" message={error.message} onRetry={refetch} />
+      ) : customers.length === 0 ? (
+        <EmptyState
+          icon="users"
+          title="No customers yet"
+          description="Add the people you want to keep in touch with. Only customers who agreed to receive emails will get your campaigns."
+          action={
+            <Button variant="primary" onClick={() => setCreating(true)}>
+              Add your first customer
+            </Button>
+          }
+        />
+      ) : (
+        <>
+          <CustomersToolbar
+            query={query}
+            onQueryChange={changeQuery}
+            filter={filter}
+            onFilterChange={changeFilter}
+            countLabel={customerCountLabel(filtered.length, customers.length)}
+          />
+          {filtered.length === 0 ? (
+            <EmptyState
+              icon="search"
+              title="No customers match your search"
+              description="Try a different name, email or phone number."
+              action={<Button onClick={clearFilters}>Clear filters</Button>}
+            />
           ) : (
-            <ul className="space-y-4">
-              {customers.map((customer) => (
-                <li
-                  key={customer.id}
-                  className="rounded-xl border border-gray-800 bg-gray-900 p-5 shadow-sm"
-                >
-                  <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold">
-                        {customer.firstName} {customer.lastName}
-                      </h3>
-                      <p className="mt-1 text-sm text-gray-400">
-                        {customer.email || "No email"}
-                      </p>
-                      <p className="text-sm text-gray-400">
-                        {customer.phone || "No phone"}
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <span
-                          className={
-                            customer.emailOptIn
-                              ? "rounded-full bg-green-950 px-3 py-1 text-xs font-semibold text-green-300"
-                              : "rounded-full bg-gray-800 px-3 py-1 text-xs font-semibold text-gray-300"
-                          }
-                        >
-                          Email: {customer.emailOptIn ? "Opted in" : "Opted out"}
-                        </span>
-
-                        <span
-                          className={
-                            customer.smsOptIn
-                              ? "rounded-full bg-green-950 px-3 py-1 text-xs font-semibold text-green-300"
-                              : "rounded-full bg-gray-800 px-3 py-1 text-xs font-semibold text-gray-300"
-                          }
-                        >
-                          SMS: {customer.smsOptIn ? "Opted in" : "Opted out"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <span className="rounded-full bg-gray-800 px-3 py-1 text-xs font-semibold text-gray-300">
-                      Customer
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      className="rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-100 hover:bg-gray-700"
-                      onClick={() => handleEdit(customer)}
-                    >
-                      Edit
-                    </button>
-
-                    <button
-                      className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
-                      onClick={() => handleDelete(customer.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <>
+              <CustomerTable customers={visible.items} onEdit={setEditing} onDelete={setDeleting} />
+              <Pagination
+                page={visible.page}
+                pageCount={visible.pageCount}
+                from={visible.from}
+                to={visible.to}
+                total={visible.total}
+                onPageChange={setPage}
+              />
+            </>
           )}
-        </section>
-      </div>
-    </div>
+        </>
+      )}
+
+      <CustomerFormDialog
+        open={creating}
+        onClose={() => setCreating(false)}
+        businessId={businessId}
+        onSaved={refetch}
+      />
+      <CustomerFormDialog
+        open={editing !== null}
+        customer={editing}
+        onClose={() => setEditing(null)}
+        businessId={businessId}
+        onSaved={refetch}
+      />
+      <ConfirmDialog
+        open={deleting !== null}
+        onClose={() => setDeleting(null)}
+        title={`Delete ${deleting ? fullName(deleting) : "this customer"}?`}
+        description="This removes the customer from this business. This can’t be undone."
+        confirmLabel="Delete customer"
+        onConfirm={async () => {
+          if (!deleting) {
+            return;
+          }
+          await apiFetch(`/api/businesses/${businessId}/customers/${deleting.id}`, {
+            method: "DELETE",
+          });
+          refetch();
+          toast.success("Customer deleted");
+        }}
+      />
+    </PageContainer>
   );
 }
