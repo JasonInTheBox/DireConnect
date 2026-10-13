@@ -110,4 +110,27 @@ test.describe("businesses page", () => {
     await expect(page.getByText("Business deleted")).toBeVisible();
     await expect(dialog).toBeHidden();
   });
+
+  test("a failed delete keeps the dialog open with the error, and a retry succeeds", async ({ page }) => {
+    await mockApi(page, { businesses: [bakery, florist], failFirstDelete: true });
+    await page.goto("/businesses");
+
+    await page.getByRole("button", { name: "Actions for Fern Florist" }).click();
+    await page.getByRole("menuitem", { name: "Delete" }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Delete Fern Florist?" });
+    const confirm = dialog.getByRole("button", { name: "Delete business" });
+    await dialog.getByLabel(/Type .Fern Florist. to confirm/).fill("Fern Florist");
+    await confirm.click();
+
+    await expect(dialog.getByText("Could not delete right now")).toBeVisible();
+    await expect(dialog).toBeVisible();
+    await expect(page.getByText("Business deleted")).toHaveCount(0);
+    await expect(confirm).toBeEnabled();
+
+    await confirm.click();
+    await expect(page.getByText("Business deleted")).toBeVisible();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByRole("heading", { name: "Fern Florist" })).toHaveCount(0);
+  });
 });

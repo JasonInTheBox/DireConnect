@@ -170,6 +170,32 @@ test.describe("customers page", () => {
     await expect(page.getByText("2 customers")).toBeVisible();
   });
 
+  test("a failed delete keeps the dialog open with the error, and a retry succeeds", async ({ page }) => {
+    await mockApi(page, {
+      businesses: [bakery],
+      customers: { b1: [ada, grace, alan] },
+      failFirstDelete: true,
+    });
+    await page.goto("/businesses/b1/customers");
+
+    await page.getByRole("button", { name: "Actions for Alan Turing" }).click();
+    await page.getByRole("menuitem", { name: "Delete" }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Delete Alan Turing?" });
+    const confirm = dialog.getByRole("button", { name: "Delete customer" });
+    await confirm.click();
+
+    await expect(dialog.getByText("Could not delete right now")).toBeVisible();
+    await expect(dialog).toBeVisible();
+    await expect(page.getByText("Customer deleted")).toHaveCount(0);
+    await expect(confirm).toBeEnabled();
+
+    await confirm.click();
+    await expect(page.getByText("Customer deleted")).toBeVisible();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByRole("row", { name: /Alan Turing/ })).toHaveCount(0);
+  });
+
   test("paginates long lists", async ({ page }) => {
     const many = Array.from({ length: 120 }, (_, index) =>
       customer(`c-${index + 1}`, `Person${String(index + 1).padStart(3, "0")}`),

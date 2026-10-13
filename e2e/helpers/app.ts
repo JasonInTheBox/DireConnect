@@ -87,6 +87,8 @@ type ApiMockOptions = {
   delayWritesMs?: number;
   /** Makes the first customers list request fail with a 500. */
   failFirstCustomersGet?: boolean;
+  /** Makes the first DELETE request (business or customer) fail with a 500. */
+  failFirstDelete?: boolean;
 };
 
 function emptyDashboard(target: MockBusiness) {
@@ -115,6 +117,7 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
     requests: [] as RecordedRequest[],
     nextCustomerId: 1000,
     customersGetFailed: false,
+    deleteFailed: false,
   };
 
   // The Supabase client may try to reach its (fake) host; keep it quiet and offline.
@@ -147,6 +150,11 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
     }
     if (options.delayWritesMs && request.method() !== "GET") {
       await sleep(options.delayWritesMs);
+    }
+
+    if (request.method() === "DELETE" && options.failFirstDelete && !state.deleteFailed) {
+      state.deleteFailed = true;
+      return json(500, { error: "Could not delete right now" });
     }
 
     if (url.pathname === "/health") {
