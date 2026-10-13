@@ -21,7 +21,7 @@ export function Pagination({
   }
 
   return (
-    <nav aria-label="Pagination" className="mt-4 flex items-center justify-between gap-3">
+    <nav aria-label="Pagination" className="mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <p className="text-[13px] text-muted">
         Showing {from}–{to} of {total}
       </p>
