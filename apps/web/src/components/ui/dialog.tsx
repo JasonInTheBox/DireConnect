@@ -13,6 +13,8 @@ type DialogProps = {
   placement?: "center" | "left";
   /** Keep the title for screen readers but do not show a header. */
   hideTitle?: boolean;
+  /** When false (a request is in flight) Escape, the backdrop and the Close button do nothing. */
+  dismissible?: boolean;
 };
 
 export function Dialog({
@@ -23,6 +25,7 @@ export function Dialog({
   children,
   placement = "center",
   hideTitle = false,
+  dismissible = true,
 }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const pointerDownOnBackdrop = useRef(false);
@@ -60,10 +63,23 @@ export function Dialog({
       ref={ref}
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
-      // Fires for Escape and for element.close(); only report user-initiated closes.
-      onClose={() => {
-        if (open) {
+      // Handle Escape ourselves so `open` stays the single source of truth.
+      onCancel={(event) => {
+        event.preventDefault();
+        if (dismissible) {
           onClose();
+        }
+      }}
+      // Fires after element.close(). Only act on closes we did not ask for, such as a
+      // browser force-closing on a repeated Escape.
+      onClose={() => {
+        if (!open) {
+          return;
+        }
+        if (dismissible) {
+          onClose();
+        } else {
+          ref.current?.showModal();
         }
       }}
       onPointerDown={(event) => {
@@ -74,7 +90,7 @@ export function Dialog({
         // so a drag that starts inside the content and ends outside does not dismiss.
         const startedOnBackdrop = pointerDownOnBackdrop.current;
         pointerDownOnBackdrop.current = false;
-        if (startedOnBackdrop && event.target === event.currentTarget) {
+        if (dismissible && startedOnBackdrop && event.target === event.currentTarget) {
           onClose();
         }
       }}
@@ -107,7 +123,8 @@ export function Dialog({
                 type="button"
                 aria-label="Close"
                 onClick={onClose}
-                className="-my-2 -mr-3 flex min-h-10 min-w-10 items-center justify-center rounded-control text-muted transition-colors hover:bg-sunken hover:text-ink lg:-my-1.5 lg:-mr-2.5 lg:min-h-9 lg:min-w-9"
+                disabled={!dismissible}
+                className="-my-2 -mr-3 flex min-h-10 min-w-10 items-center justify-center rounded-control text-muted transition-colors hover:bg-sunken hover:text-ink disabled:pointer-events-none disabled:opacity-50 lg:-my-1.5 lg:-mr-2.5 lg:min-h-9 lg:min-w-9"
               >
                 <Icon name="x" />
               </button>
