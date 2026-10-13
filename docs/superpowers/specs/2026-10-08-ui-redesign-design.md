@@ -136,7 +136,7 @@ Tables scroll horizontally in their container; the customer table collapses to s
 
 ## 7. Pages
 
-**Businesses.** Two-column card grid: monogram, name, clamped description, contact line, **Open**; menu with Edit and Delete (delete requires typing the business name; deletion cascades to customers and campaigns). Current business marked. "New business" opens the shared create/edit dialog. Empty state with a create action.
+**Businesses.** Two-column card grid: monogram, name, clamped description, contact line, **Open**; menu with Edit and Delete (delete requires typing the business name; deletion cascades to customers and campaigns). "New business" opens the shared create/edit dialog. Empty state with a create action. The current business is marked in the sidebar switcher, not on this page: selection comes from the URL, and `/businesses` is outside any business.
 
 **Customers.** Toolbar: search (name, email, phone), consent filter (All customers, Opted in to email, Not opted in), count, **Add customer**. Add/Edit share a dialog. Columns: Name, Email, Phone, Email consent badge (Email opted in / Email not opted in), row menu (Edit, Delete with confirm). The form's email consent checkbox is unchecked by default, keeps the wording "Customer explicitly agreed to receive promotional emails", and has helper text explaining that only customers who agreed can receive campaigns. SMS consent is not a primary control (SMS is paused): the form passes the existing `smsOptIn` value through unchanged on edit so it is never overwritten, and a small "SMS opted in" badge appears only for customers who have it. Client-side pagination beyond 50 rows. Empty states: first customer; no search matches. Skeleton while loading; ErrorState with Retry.
 

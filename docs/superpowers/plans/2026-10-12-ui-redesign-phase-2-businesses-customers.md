@@ -37,6 +37,7 @@ Carried verbatim from Phase 1, plus the rulings its final review recorded:
 - **Consent has two displayed states, not three.** The spec lists "Opted in / Not opted in / Unsubscribed". The API cannot tell "never opted in" from "unsubscribed": creating or editing a customer with no opt-ins sets `unsubscribedAt = now`, and the unsubscribe link sets `emailOptIn=false` plus `unsubscribedAt`. So a customer is **Email opted in** only when `emailOptIn && !unsubscribedAt`; every other customer is **Email not opted in**. The filter offers *All*, *Opted in to email*, *Not opted in*. Task 7 updates the spec accordingly.
 - SMS is paused: customers who have `smsOptIn` get a small neutral "SMS opted in" badge; the form passes the existing `smsOptIn` through unchanged on edit and sends `false` on create.
 - The customer table appears at `lg` (1024px) and above; below that the list is stacked cards. (The sidebar takes 256px, so a table at `md` would be cramped, and a table with an overflow wrapper would clip the row action menus.)
+- **The Businesses page does not mark a "current" business.** Selection comes from the URL (`/businesses/:businessId/...`) and `/businesses` sits outside any business, so there is nothing to mark there. The current business is marked in the sidebar business switcher instead.
 
 ## Baseline (recorded 2026-10-12 on `main` at `b48a407`)
 
