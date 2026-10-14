@@ -51,7 +51,7 @@ function DashboardView({ businessId }: { businessId: string }) {
         actions={
           <>
             <Link
-              href={`/businesses/${businessId}/campaigns`}
+              href={`/businesses/${businessId}/campaigns/new`}
               className={buttonClasses({ variant: "secondary" })}
             >
               New campaign

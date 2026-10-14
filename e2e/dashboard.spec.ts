@@ -214,7 +214,7 @@ test.describe("dashboard", () => {
     await expect(delivery).not.toContainText("100% success rate");
   });
 
-  test("quick actions open the customer dialog and the campaigns page", async ({ page }) => {
+  test("quick actions open the customer dialog and the campaign wizard", async ({ page }) => {
     await mockApi(page, {
       businesses: [bakery],
       customers: { b1: [...optedIn] },
@@ -229,7 +229,7 @@ test.describe("dashboard", () => {
     await expect(dialog).toBeHidden();
 
     await page.getByRole("link", { name: "New campaign" }).click();
-    await expect(page).toHaveURL(/\/businesses\/b1\/campaigns$/);
+    await expect(page).toHaveURL(/\/businesses\/b1\/campaigns\/new$/);
   });
 
   test("a failed load shows an error with a retry", async ({ page }) => {

@@ -53,10 +53,10 @@ export function SetupChecklist({
               </Button>
             ) : (
               <Link
-                href={`/businesses/${businessId}/campaigns`}
+                href={`/businesses/${businessId}/campaigns/new`}
                 className={buttonClasses({ variant: "secondary" })}
               >
-                Go to campaigns
+                Create a campaign
               </Link>
             )}
           </li>
