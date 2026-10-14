@@ -317,3 +317,259 @@ test.describe("campaign wizard: editing", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Campaigns" })).toBeVisible();
   });
 });
+
+async function reachReview(page: import("@playwright/test").Page) {
+  await page.goto("/businesses/b1/campaigns/new");
+  await goToMessageStep(page, "Autumn menu");
+  await page.getByRole("textbox", { name: "Message" }).fill("Fresh loaves.");
+  await page.getByRole("button", { name: "Review" }).click();
+  await expect(page.getByText("2 customers will receive this campaign")).toBeVisible();
+}
+
+test.describe("campaign wizard: review and send", () => {
+  test.beforeEach(async ({ page }) => {
+    await signIn(page);
+  });
+
+  test("sends now after confirming, saving the timing before queueing", async ({ page }) => {
+    const state = await mockApi(page, { businesses: [bakery], customers: { b1: people } });
+    await reachReview(page);
+
+    await expect(page.getByRole("radio", { name: "Send now" })).toBeChecked();
+    await page.getByRole("button", { name: "Send now" }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Send to 2 customers now?" });
+    await expect(dialog).toContainText("Queued campaigns can’t be edited or cancelled.");
+    await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+    await dialog.getByRole("button", { name: "Send now" }).click();
+
+    await expect(page.getByText("Campaign queued")).toBeVisible();
+    await expect(page).toHaveURL(/\/businesses\/b1\/campaigns\/n-2000\/analytics$/);
+
+    const order = state.requests
+      .filter((request) => request.method !== "GET")
+      .map((request) => `${request.method} ${request.path}`);
+    expect(order).toEqual([
+      "POST /api/businesses/b1/campaigns",
+      "PUT /api/businesses/b1/campaigns/n-2000",
+      "POST /api/businesses/b1/campaigns/n-2000/queue",
+    ]);
+    const put = state.requests.find((request) => request.method === "PUT");
+    expect(put?.body).toMatchObject({ sendAt: "" });
+  });
+
+  test("cancelling the confirmation sends nothing", async ({ page }) => {
+    const state = await mockApi(page, { businesses: [bakery], customers: { b1: people } });
+    await reachReview(page);
+
+    await page.getByRole("button", { name: "Send now" }).click();
+    await page
+      .getByRole("dialog", { name: "Send to 2 customers now?" })
+      .getByRole("button", { name: "Cancel" })
+      .click();
+
+    await expect(page.getByRole("dialog")).toBeHidden();
+    expect(state.requests.some((request) => request.path.endsWith("/queue"))).toBe(false);
+  });
+
+  test("schedules for a future time, sent as an ISO instant, and refuses empty and past times", async ({
+    page,
+  }) => {
+    const state = await mockApi(page, { businesses: [bakery], customers: { b1: people } });
+    await reachReview(page);
+
+    await page.getByRole("radio", { name: "Schedule for later" }).check();
+    await expect(page.getByText(/Times are shown in your time zone \(/)).toBeVisible();
+
+    const submit = page.getByRole("button", { name: "Schedule campaign" });
+    await submit.click();
+    await expect(page.getByText("Choose a date and time.")).toBeVisible();
+    await expect(page.getByLabel("Date and time")).toBeFocused();
+
+    await page.getByLabel("Date and time").fill("2020-01-01T09:00");
+    await submit.click();
+    await expect(page.getByText("Choose a time in the future.")).toBeVisible();
+    await expect(page.getByRole("dialog")).toBeHidden();
+
+    await page.getByLabel("Date and time").fill("2099-01-01T09:30");
+    await submit.click();
+    const dialog = page.getByRole("dialog", { name: "Schedule for 2 customers?" });
+    await expect(dialog).toContainText("Jan 1, 2099");
+    await dialog.getByRole("button", { name: "Schedule campaign" }).click();
+
+    await expect(page.getByText("Campaign scheduled")).toBeVisible();
+    await expect(page).toHaveURL(/\/campaigns\/n-2000\/analytics$/);
+
+    const expected = await page.evaluate(() => new Date("2099-01-01T09:30").toISOString());
+    const put = state.requests.find((request) => request.method === "PUT");
+    expect(put?.body).toMatchObject({ sendAt: expected });
+  });
+
+  test("a double click on the confirmation queues the campaign once", async ({ page }) => {
+    const state = await mockApi(page, {
+      businesses: [bakery],
+      customers: { b1: people },
+      delayWritesMs: 400,
+    });
+    await reachReview(page);
+
+    await page.getByRole("button", { name: "Send now" }).click();
+    await page
+      .getByRole("dialog", { name: "Send to 2 customers now?" })
+      .getByRole("button", { name: "Send now" })
+      .dblclick();
+
+    await expect(page).toHaveURL(/\/analytics$/);
+    const queues = state.requests.filter((request) => request.path.endsWith("/queue"));
+    expect(queues).toHaveLength(1);
+  });
+
+  test("two confirmations in the same tick still queue the campaign once", async ({ page }) => {
+    // A disabled button stops a real double click, so call the confirm button's click handler
+    // twice before React re-renders: only the in-flight guard can stop the second call.
+    const state = await mockApi(page, {
+      businesses: [bakery],
+      customers: { b1: people },
+      delayWritesMs: 400,
+    });
+    await reachReview(page);
+
+    await page.getByRole("button", { name: "Send now" }).click();
+    const dialog = page.getByRole("dialog", { name: "Send to 2 customers now?" });
+    await expect(dialog).toBeVisible();
+
+    await dialog.getByRole("button", { name: "Send now" }).evaluate((button) => {
+      const propsKey = Object.keys(button).find((key) => key.startsWith("__reactProps$"));
+      const props = propsKey
+        ? (button as unknown as Record<string, { onClick?: () => void }>)[propsKey]
+        : undefined;
+      if (!props?.onClick) {
+        throw new Error("confirm button has no React click handler");
+      }
+      props.onClick();
+      props.onClick();
+    });
+
+    await expect(page).toHaveURL(/\/analytics$/);
+    // Give a stray second request time to arrive before counting.
+    await page.waitForTimeout(600);
+    const queues = state.requests.filter((request) => request.path.endsWith("/queue"));
+    expect(queues).toHaveLength(1);
+  });
+
+  test("blocks sending, with an explanation, when no one can receive the campaign", async ({
+    page,
+  }) => {
+    await mockApi(page, {
+      businesses: [bakery],
+      customers: { b1: [customer("c-9", "Sam", { email: "sam@example.com" })] },
+    });
+    await page.goto("/businesses/b1/campaigns/new");
+    await goToMessageStep(page, "Autumn menu");
+    await page.getByRole("textbox", { name: "Message" }).fill("Fresh loaves.");
+    await page.getByRole("button", { name: "Review" }).click();
+
+    await expect(page.getByText("No one can receive this campaign yet")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Send now" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Check again" })).toBeVisible();
+  });
+
+  test("blocks sending above the recipient limit and states the numbers", async ({ page }) => {
+    const crowd = Array.from({ length: 11 }, (_, index) =>
+      customer(`c-${index}`, `Person${index}`, { email: `p${index}@example.com`, emailOptIn: true }),
+    );
+    await mockApi(page, { businesses: [bakery], customers: { b1: crowd } });
+    await page.goto("/businesses/b1/campaigns/new");
+    await goToMessageStep(page, "Autumn menu");
+    await page.getByRole("textbox", { name: "Message" }).fill("Fresh loaves.");
+    await page.getByRole("button", { name: "Review" }).click();
+
+    await expect(page.getByText("Too many recipients")).toBeVisible();
+    await expect(page.getByText(/limited to 10 recipients/)).toBeVisible();
+    await expect(page.getByText(/would reach 11/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Send now" })).toBeDisabled();
+  });
+
+  test("shows the server's refusal on the Review step, keeps the draft, and allows another try", async ({
+    page,
+  }) => {
+    const state = await mockApi(page, {
+      businesses: [bakery],
+      customers: { b1: people },
+      queueError: { status: 403, error: "Campaign sending is not enabled for this account." },
+    });
+    await reachReview(page);
+
+    await page.getByRole("button", { name: "Send now" }).click();
+    await page
+      .getByRole("dialog", { name: "Send to 2 customers now?" })
+      .getByRole("button", { name: "Send now" })
+      .click();
+
+    await expect(page.getByRole("dialog")).toBeHidden();
+    const panel = page.getByRole("alert").filter({ hasText: "The campaign wasn’t sent" });
+    await expect(panel).toContainText("Campaign sending is not enabled for this account.");
+    await expect(panel).toContainText("Your draft is saved");
+    await expect(panel).toBeFocused();
+    await expect(page).toHaveURL(/\/campaigns\/new$/);
+    await expect(page.getByRole("button", { name: "Send now" })).toBeEnabled();
+
+    // The panel stays until the user acts: going back to edit clears it.
+    await page.getByRole("button", { name: "Back" }).click();
+    await page.getByRole("button", { name: "Review" }).click();
+    await expect(page.getByText("The campaign wasn’t sent")).toHaveCount(0);
+
+    // The draft is kept and can be saved.
+    await page.getByRole("button", { name: "Save draft" }).click();
+    await expect(page).toHaveURL(/\/businesses\/b1\/campaigns$/);
+    await expect(page.getByRole("link", { name: "Autumn menu" })).toBeVisible();
+    expect(state.campaigns.b1.map((item) => item.status)).toEqual(["DRAFT"]);
+  });
+
+  test("opens a draft with a future send time as a schedule, and one with a past time as Send now", async ({
+    page,
+  }) => {
+    await mockApi(page, {
+      businesses: [bakery],
+      customers: { b1: people },
+      campaigns: {
+        b1: [
+          campaign("k-1", "Future send", { sendAt: "2099-06-01T08:00:00.000Z" }),
+          campaign("k-2", "Past send", { sendAt: "2020-06-01T08:00:00.000Z" }),
+        ],
+      },
+    });
+
+    for (const [id, expectSchedule] of [
+      ["k-1", true],
+      ["k-2", false],
+    ] as const) {
+      await page.goto(`/businesses/b1/campaigns/${id}/edit`);
+      await page.getByRole("button", { name: "Continue" }).click();
+      await page.getByRole("button", { name: "Continue" }).click();
+      await page.getByRole("button", { name: "Review" }).click();
+      await expect(page.getByText("2 customers will receive this campaign")).toBeVisible();
+
+      if (expectSchedule) {
+        await expect(page.getByRole("radio", { name: "Schedule for later" })).toBeChecked();
+        await expect(page.getByLabel("Date and time")).not.toHaveValue("");
+      } else {
+        await expect(page.getByRole("radio", { name: "Send now" })).toBeChecked();
+        await expect(page.getByLabel("Date and time")).toHaveCount(0);
+        await expect(page.getByText("Choose a time in the future.")).toHaveCount(0);
+      }
+    }
+  });
+});
+
+test.describe("campaign wizard: unconfirmed email", () => {
+  test("blocks sending until the account email is confirmed", async ({ page }) => {
+    // No file-level sign-in applies here, so this session is the only one the page sees.
+    await signIn(page, { emailConfirmed: false });
+    await mockApi(page, { businesses: [bakery], customers: { b1: people } });
+    await reachReview(page);
+
+    await expect(page.getByText("Confirm your email address first")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Send now" })).toBeDisabled();
+  });
+});

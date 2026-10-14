@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { SendConfirmDialog } from "./send-confirm-dialog";
 import { StepBasics } from "./step-basics";
 import { StepMessage } from "./step-message";
 import { StepRecipients } from "./step-recipients";
 import { StepReview } from "./step-review";
 import { WizardStepper } from "./stepper";
+import { useSession } from "@/components/shell/session-provider";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { FormError } from "@/components/ui/state";
 import { useToast } from "@/components/ui/toast";
@@ -15,6 +17,10 @@ import { ApiError, apiFetch, fieldErrorsFromApiError } from "@/lib/apiClient";
 import {
   campaignPayload,
   canSaveDraft,
+  confirmCopy,
+  sendBlocks,
+  submitLabel,
+  successMessage,
   validateStep,
   WIZARD_STEPS,
   wizardValues,
@@ -22,6 +28,7 @@ import {
   type WizardValues,
 } from "@/lib/campaignWizard";
 import { focusFirstInvalid, splitFieldErrors } from "@/lib/forms";
+import { formatDateTime, localInputToIso } from "@/lib/schedule";
 import type { Campaign, CampaignPreviewResponse, DashboardResponse } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 
@@ -52,6 +59,11 @@ export function CampaignWizard({
   const formRef = useRef<HTMLFormElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const shownStep = useRef(stepIndex);
+  const session = useSession();
+  const [confirming, setConfirming] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const sendErrorRef = useRef<HTMLDivElement>(null);
 
   const step = WIZARD_STEPS[stepIndex].id;
   const isReview = step === "review";
@@ -69,6 +81,21 @@ export function CampaignWizard({
     shownStep.current = stepIndex;
     headingRef.current?.focus();
   }, [stepIndex]);
+
+  // A refused send leaves a panel on the Review step; move focus there once it appears.
+  useEffect(() => {
+    if (sendError) {
+      sendErrorRef.current?.focus();
+    }
+  }, [sendError]);
+
+  const eligibleCount = preview.data?.summary.eligibleCount ?? null;
+  const blocks =
+    eligibleCount === null
+      ? []
+      : sendBlocks({ eligibleCount, emailConfirmed: session.emailConfirmed });
+  const canSend = eligibleCount !== null && blocks.length === 0;
+  const scheduledIso = localInputToIso(values.scheduledAt);
 
   function setField<K extends keyof WizardValues>(key: K, value: WizardValues[K]) {
     setValues((previous) => ({ ...previous, [key]: value }));
@@ -117,7 +144,23 @@ export function CampaignWizard({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (inFlight.current || isReview) {
+    if (inFlight.current) {
+      return;
+    }
+
+    if (isReview) {
+      // The final action asks for confirmation first; nothing is sent from here.
+      const reviewErrors = validateStep("review", values);
+      if (Object.keys(reviewErrors).length > 0) {
+        setErrors(reviewErrors);
+        focusFirstInvalid(event.currentTarget);
+        return;
+      }
+      if (canSend) {
+        setErrors({});
+        setSendError(null);
+        setConfirming(true);
+      }
       return;
     }
 
@@ -168,7 +211,42 @@ export function CampaignWizard({
     }
   }
 
+  async function handleSend() {
+    if (inFlight.current || !draftId) {
+      return;
+    }
+    // The chosen time may have passed while the confirm dialog was open.
+    const staleErrors = validateStep("review", values);
+    if (Object.keys(staleErrors).length > 0) {
+      setConfirming(false);
+      setErrors(staleErrors);
+      focusFirstInvalid(formRef.current);
+      return;
+    }
+
+    inFlight.current = true;
+    setSending(true);
+    try {
+      const base = `/api/businesses/${businessId}/campaigns/${draftId}`;
+      // The queue step reads the stored send time, so save the chosen timing first.
+      await apiFetch<Campaign>(base, { method: "PUT", body: campaignPayload(values) });
+      await apiFetch(`${base}/queue`, { method: "POST" });
+      setConfirming(false);
+      toast.success(successMessage(values.timing));
+      router.push(`/businesses/${businessId}/campaigns/${draftId}/analytics`);
+    } catch (error) {
+      setConfirming(false);
+      setSendError(
+        error instanceof ApiError ? error.message : "Could not send the campaign. Try again.",
+      );
+    } finally {
+      inFlight.current = false;
+      setSending(false);
+    }
+  }
+
   function handleBack() {
+    setSendError(null);
     setFormError(null);
     setErrors({});
     setStepIndex((index) => Math.max(0, index - 1));
@@ -220,7 +298,22 @@ export function CampaignWizard({
               onChange={(value) => setField("message", value)}
             />
           ) : (
-            <StepReview values={values} preview={preview} />
+            <StepReview
+              values={values}
+              errors={errors}
+              onChange={(key, value) => {
+                setSendError(null);
+                setField(key, value);
+              }}
+              preview={preview}
+              blocks={blocks}
+              sendError={sendError}
+              sendErrorRef={sendErrorRef}
+              onRecheck={() => {
+                setSendError(null);
+                preview.refetch();
+              }}
+            />
           )}
         </section>
 
@@ -255,7 +348,15 @@ export function CampaignWizard({
               >
                 {step === "message" ? "Review" : "Continue"}
               </Button>
-            ) : null}
+            ) : (
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={!canSend || busy !== null || sending}
+              >
+                {submitLabel(values.timing)}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -265,6 +366,18 @@ export function CampaignWizard({
           </p>
         ) : null}
       </form>
+
+      <SendConfirmDialog
+        open={confirming}
+        sending={sending}
+        onConfirm={handleSend}
+        onCancel={() => setConfirming(false)}
+        {...confirmCopy({
+          recipientCount: eligibleCount ?? 0,
+          timing: values.timing,
+          scheduledLabel: scheduledIso ? formatDateTime(scheduledIso) : "",
+        })}
+      />
     </div>
   );
 }

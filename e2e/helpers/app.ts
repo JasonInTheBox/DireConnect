@@ -95,8 +95,9 @@ export type MockAnalytics = Partial<{
 }>;
 
 /** Seeds a signed-in Supabase session; the client reads it locally and does not verify it. */
-export async function signIn(page: Page) {
-  await page.addInitScript(() => {
+export async function signIn(page: Page, options: { emailConfirmed?: boolean } = {}) {
+  const emailConfirmed = options.emailConfirmed ?? true;
+  await page.addInitScript((confirmed: boolean) => {
     window.localStorage.setItem(
       "sb-example-auth-token",
       JSON.stringify({
@@ -109,14 +110,14 @@ export async function signIn(page: Page) {
           id: "user-1",
           aud: "authenticated",
           email: "owner@example.com",
-          email_confirmed_at: "2026-01-01T00:00:00Z",
+          ...(confirmed ? { email_confirmed_at: "2026-01-01T00:00:00Z" } : {}),
           app_metadata: {},
           user_metadata: {},
           created_at: "2026-01-01T00:00:00Z",
         },
       }),
     );
-  });
+  }, emailConfirmed);
 }
 
 export type RecordedRequest = { method: string; path: string; body: unknown };
