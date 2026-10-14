@@ -255,6 +255,18 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Mirrors the API schema: a campaign needs a non-blank title and message. */
+function campaignBodyErrors(body: Record<string, unknown> | undefined) {
+  const details: Array<{ path: string[]; message: string }> = [];
+  if (!String(body?.title ?? "").trim()) {
+    details.push({ path: ["title"], message: "Campaign title is required" });
+  }
+  if (!String(body?.message ?? "").trim()) {
+    details.push({ path: ["message"], message: "Message is required" });
+  }
+  return details;
+}
+
 export async function mockApi(page: Page, options: ApiMockOptions) {
   const state = {
     businesses: [...options.businesses],
@@ -442,11 +454,9 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
             error: "SMS campaigns are temporarily disabled. Create an email campaign instead.",
           });
         }
-        if (!String(body?.title ?? "").trim()) {
-          return json(400, {
-            error: "Invalid request body",
-            details: [{ path: ["title"], message: "Campaign title is required" }],
-          });
+        const invalid = campaignBodyErrors(body);
+        if (invalid.length > 0) {
+          return json(400, { error: "Invalid request body", details: invalid });
         }
         const created = campaign(
           `n-${state.nextCampaignId++}`,
@@ -469,6 +479,10 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
           return json(404, {
             error: "Campaign not found. Queued or sent campaigns cannot be edited.",
           });
+        }
+        const invalid = campaignBodyErrors(body);
+        if (invalid.length > 0) {
+          return json(400, { error: "Invalid request body", details: invalid });
         }
         target.title = String(body?.title);
         target.message = String(body?.message ?? "");
