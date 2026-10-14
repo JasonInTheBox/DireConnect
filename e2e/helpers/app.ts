@@ -50,6 +50,50 @@ export function customer(
   };
 }
 
+export type MockCampaign = {
+  id: string;
+  ownerId: string;
+  businessId: string;
+  title: string;
+  message: string;
+  channel: "EMAIL" | "SMS";
+  status: "DRAFT" | "QUEUED" | "SENT" | "FAILED";
+  sendAt: string | null;
+  targetAudience: "ALL" | "EMAIL_OPTED_IN" | "SMS_OPTED_IN";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function campaign(
+  id: string,
+  title: string,
+  overrides: Partial<MockCampaign> = {},
+  businessId = "b1",
+): MockCampaign {
+  return {
+    id,
+    ownerId: "user-1",
+    businessId,
+    title,
+    message: `Message for ${title}`,
+    channel: "EMAIL",
+    status: "DRAFT",
+    sendAt: null,
+    targetAudience: "ALL",
+    createdAt: "2026-10-01T10:00:00.000Z",
+    updatedAt: "2026-10-01T10:00:00.000Z",
+    ...overrides,
+  };
+}
+
+export type MockAnalytics = Partial<{
+  eligibleCount: number;
+  sentCount: number;
+  failedDeliveryCount: number;
+  pendingCount: number;
+  skippedBeforeSendCount: number;
+}>;
+
 /** Seeds a signed-in Supabase session; the client reads it locally and does not verify it. */
 export async function signIn(page: Page) {
   await page.addInitScript(() => {
@@ -114,6 +158,14 @@ type ApiMockOptions = {
   dashboards?: Record<string, MockDashboardData>;
   /** Makes the first dashboard request fail with a 500. */
   failFirstDashboardGet?: boolean;
+  /** Campaigns per business id. */
+  campaigns?: Record<string, MockCampaign[]>;
+  /** Delivery numbers per campaign id (missing fields are zero). */
+  analytics?: Record<string, MockAnalytics>;
+  /** Campaign ids whose analytics request fails with a 500. */
+  failAnalyticsFor?: string[];
+  /** Makes every queue request fail with this status and message. */
+  queueError?: { status: number; error: string };
 };
 
 function dashboardFor(
@@ -149,6 +201,56 @@ function dashboardFor(
   };
 }
 
+/** Mirrors the API's live eligibility for a draft (no snapshot yet). */
+function previewFor(target: MockCampaign, customers: MockCustomer[]) {
+  const results = customers.map((item) => {
+    if (!item.emailOptIn || item.unsubscribedAt) {
+      return {
+        customerId: item.id,
+        recipient: item.email,
+        eligible: false,
+        reason: item.unsubscribedAt ? "Customer has unsubscribed" : "Customer has not opted in to EMAIL",
+      };
+    }
+    if (!item.email) {
+      return {
+        customerId: item.id,
+        recipient: null,
+        eligible: false,
+        reason: "Customer has no EMAIL recipient",
+      };
+    }
+    return { customerId: item.id, recipient: item.email, eligible: true, reason: null };
+  });
+
+  const eligible = results.filter((result) => result.eligible);
+  const skipped = results.filter((result) => !result.eligible);
+  const skippedByReason: Record<string, number> = {};
+  for (const result of skipped) {
+    const reason = result.reason ?? "Unknown reason";
+    skippedByReason[reason] = (skippedByReason[reason] ?? 0) + 1;
+  }
+
+  return {
+    campaign: {
+      id: target.id,
+      title: target.title,
+      channel: target.channel,
+      targetAudience: target.targetAudience,
+      status: target.status,
+    },
+    summary: {
+      totalCustomers: results.length,
+      eligibleCount: eligible.length,
+      skippedCount: skipped.length,
+      skippedByReason,
+      isSnapshot: false,
+    },
+    eligible,
+    skipped,
+  };
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -161,6 +263,10 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
     ) as Record<string, MockCustomer[]>,
     created: [] as Array<Record<string, unknown>>,
     requests: [] as RecordedRequest[],
+    campaigns: Object.fromEntries(
+      Object.entries(options.campaigns ?? {}).map(([id, list]) => [id, list.map((item) => ({ ...item }))]),
+    ) as Record<string, MockCampaign[]>,
+    nextCampaignId: 2000,
     nextCustomerId: 1000,
     customersGetFailed: false,
     deleteFailed: false,
@@ -317,8 +423,144 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
       }
     }
 
-    if (/^\/api\/businesses\/[^/]+\/campaigns$/.test(url.pathname)) {
-      return json(200, []);
+    const campaignRoute = url.pathname.match(
+      /^\/api\/businesses\/([^/]+)\/campaigns(?:\/([^/]+))?(?:\/(analytics|preview|queue|logs))?$/,
+    );
+    if (campaignRoute) {
+      const [, businessId, campaignId, action] = campaignRoute;
+      const list = (state.campaigns[businessId] ??= []);
+      const target = campaignId ? list.find((item) => item.id === campaignId) : undefined;
+      const now = new Date().toISOString();
+
+      if (!campaignId && request.method() === "GET") {
+        return json(200, [...list]);
+      }
+
+      if (!campaignId && request.method() === "POST") {
+        if (body?.channel === "SMS") {
+          return json(422, {
+            error: "SMS campaigns are temporarily disabled. Create an email campaign instead.",
+          });
+        }
+        if (!String(body?.title ?? "").trim()) {
+          return json(400, {
+            error: "Invalid request body",
+            details: [{ path: ["title"], message: "Campaign title is required" }],
+          });
+        }
+        const created = campaign(
+          `n-${state.nextCampaignId++}`,
+          String(body?.title),
+          {
+            message: String(body?.message ?? ""),
+            targetAudience: (body?.targetAudience as MockCampaign["targetAudience"]) ?? "ALL",
+            sendAt: body?.sendAt ? String(body.sendAt) : null,
+            createdAt: now,
+            updatedAt: now,
+          },
+          businessId,
+        );
+        list.unshift(created);
+        return json(201, created);
+      }
+
+      if (campaignId && !action && request.method() === "PUT") {
+        if (!target || target.status !== "DRAFT" || target.channel !== "EMAIL") {
+          return json(404, {
+            error: "Campaign not found. Queued or sent campaigns cannot be edited.",
+          });
+        }
+        target.title = String(body?.title);
+        target.message = String(body?.message ?? "");
+        target.targetAudience = (body?.targetAudience as MockCampaign["targetAudience"]) ?? "ALL";
+        target.sendAt = body?.sendAt ? String(body.sendAt) : null;
+        target.updatedAt = now;
+        return json(200, target);
+      }
+
+      if (campaignId && !action && request.method() === "DELETE") {
+        if (!target || target.status !== "DRAFT") {
+          return json(404, {
+            error: "Campaign not found. Queued or sent campaigns cannot be deleted.",
+          });
+        }
+        state.campaigns[businessId] = list.filter((item) => item.id !== campaignId);
+        return noContent();
+      }
+
+      if (campaignId && action === "analytics" && request.method() === "GET") {
+        if (!target) {
+          return json(404, { error: "Campaign not found" });
+        }
+        if (options.failAnalyticsFor?.includes(campaignId)) {
+          return json(500, { error: "Analytics unavailable" });
+        }
+        const numbers = {
+          eligibleCount: 0,
+          sentCount: 0,
+          failedDeliveryCount: 0,
+          pendingCount: 0,
+          skippedBeforeSendCount: 0,
+          ...options.analytics?.[campaignId],
+        };
+        const attempted = numbers.sentCount + numbers.failedDeliveryCount + numbers.pendingCount;
+        return json(200, {
+          campaign: {
+            id: target.id,
+            title: target.title,
+            channel: target.channel,
+            targetAudience: target.targetAudience,
+            status: target.status,
+          },
+          summary: {
+            analyticsSource: "SNAPSHOT",
+            hasSnapshot: true,
+            totalSnapshotCount: numbers.eligibleCount + numbers.skippedBeforeSendCount,
+            totalRecipientCount: numbers.eligibleCount + numbers.skippedBeforeSendCount,
+            attemptedSendCount: attempted,
+            totalLogCount: attempted,
+            sentRate: attempted > 0 ? Math.round((numbers.sentCount / attempted) * 100) : null,
+            skippedByReason: {},
+            failedByReason: {},
+            ...numbers,
+          },
+        });
+      }
+
+      if (campaignId && action === "preview" && request.method() === "GET") {
+        return target
+          ? json(200, previewFor(target, state.customers[businessId] ?? []))
+          : json(404, { error: "Campaign not found" });
+      }
+
+      if (campaignId && action === "queue" && request.method() === "POST") {
+        if (options.queueError) {
+          return json(options.queueError.status, { error: options.queueError.error });
+        }
+        if (!target || target.status !== "DRAFT") {
+          return json(404, { error: "Draft campaign not found or campaign is already queued/sent" });
+        }
+        const eligibleCount = previewFor(target, state.customers[businessId] ?? []).summary
+          .eligibleCount;
+        if (eligibleCount === 0) {
+          return json(409, { error: "This campaign has no eligible, opted-in email recipients." });
+        }
+        if (eligibleCount > 10) {
+          return json(409, {
+            error: "Campaigns are limited to 10 recipients. Narrow the audience before sending.",
+            eligibleCount,
+            maxRecipients: 10,
+          });
+        }
+        target.status = "QUEUED";
+        target.updatedAt = now;
+        return json(200, {
+          message: target.sendAt ? "Campaign scheduled successfully" : "Campaign queued successfully",
+          campaignId,
+          delay: 0,
+          scheduledFor: target.sendAt,
+        });
+      }
     }
 
     return json(404, { error: "Not mocked" });
