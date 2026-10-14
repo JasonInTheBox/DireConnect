@@ -61,27 +61,73 @@ test.describe("campaign pages: keyboard and small screens", () => {
     await expect(send).toBeFocused();
   });
 
-  for (const path of ["/businesses/b1/campaigns", "/businesses/b1/campaigns/new"]) {
-    test(`${path} does not scroll sideways at 375px`, async ({ page }) => {
-      await mockApi(page, {
-        businesses: [bakery],
-        customers: { b1: people },
-        campaigns: {
-          b1: [
-            campaign("k-1", "A campaign name that is much longer than the phone screen is wide, to test wrapping"),
-            campaign("k-4", "Loyalty thanks", { status: "SENT" }),
-          ],
-        },
-        analytics: { "k-4": { eligibleCount: 4, sentCount: 3, failedDeliveryCount: 1 } },
-      });
-      await page.setViewportSize({ width: 375, height: 812 });
-      await page.goto(path);
-      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  const LONG_NAME =
+    "A campaign name that is much longer than the phone screen is wide, to test wrapping";
 
-      const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      );
-      expect(overflow).toBeLessThanOrEqual(0);
-    });
+  async function horizontalOverflow(page: import("@playwright/test").Page) {
+    return page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
   }
+
+  test("the campaign list does not scroll sideways at 375px", async ({ page }) => {
+    await mockApi(page, {
+      businesses: [bakery],
+      customers: { b1: people },
+      campaigns: {
+        b1: [campaign("k-1", LONG_NAME), campaign("k-4", "Loyalty thanks", { status: "SENT" })],
+      },
+      analytics: { "k-4": { eligibleCount: 4, sentCount: 3, failedDeliveryCount: 1 } },
+    });
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto("/businesses/b1/campaigns");
+
+    // Measure only once the real content (long title, delivery text) is on the page.
+    await expect(page.getByRole("link", { name: LONG_NAME })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Loyalty thanks" })).toBeVisible();
+    // Cards show at this width; the table is hidden, so match the card's definition only.
+    await expect(page.locator("dd").filter({ hasText: "3 of 4 sent, 1 failed" })).toBeVisible();
+
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+  });
+
+  test("the wizard does not scroll sideways at 375px, on the first step or on Review", async ({
+    page,
+  }) => {
+    await mockApi(page, { businesses: [bakery], customers: { b1: people } });
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto("/businesses/b1/campaigns/new");
+    await expect(page.getByRole("heading", { level: 2, name: "Basics" })).toBeVisible();
+
+    await page.getByLabel("Campaign name").fill(LONG_NAME);
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page
+      .getByRole("textbox", { name: "Message" })
+      .fill(`${"Averyveryverylongunbrokenword".repeat(6)} and some ordinary words after it.`);
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+
+    await page.getByRole("button", { name: "Review" }).click();
+    await expect(page.getByText("2 customers will receive this campaign")).toBeVisible();
+    await page.getByRole("radio", { name: "Schedule for later" }).check();
+    await expect(page.getByLabel("Date and time")).toBeVisible();
+    await expect(page.getByText(/Times are shown in your time zone \(/)).toBeVisible();
+
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+  });
+
+  test("Tab reaches the first-step controls in order", async ({ page }) => {
+    await mockApi(page, { businesses: [bakery], customers: { b1: people } });
+    await page.goto("/businesses/b1/campaigns/new");
+    await expect(page.getByRole("heading", { level: 2, name: "Basics" })).toBeVisible();
+
+    await page.getByLabel("Campaign name").focus();
+    // Save draft is disabled without a name and message, so Tab skips it: Cancel, then Continue.
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("link", { name: "Cancel" })).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("button", { name: "Continue" })).toBeFocused();
+  });
 });
