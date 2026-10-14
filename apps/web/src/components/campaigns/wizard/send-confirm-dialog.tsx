@@ -1,7 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { SlowNotice } from "@/components/ui/state";
+import { SLOW_RESPONSE_MS } from "@/lib/useApi";
 
 /**
  * Asks for the final confirmation. It holds no error state: a refused send closes it and the
@@ -24,6 +27,18 @@ export function SendConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const [slow, setSlow] = useState(false);
+
+  // A cold server can take a minute; explain the wait once it passes the usual response time.
+  useEffect(() => {
+    if (!sending) {
+      setSlow(false);
+      return;
+    }
+    const timer = setTimeout(() => setSlow(true), SLOW_RESPONSE_MS);
+    return () => clearTimeout(timer);
+  }, [sending]);
+
   return (
     <Dialog
       open={open}
@@ -32,6 +47,9 @@ export function SendConfirmDialog({
       description={description}
       dismissible={!sending}
     >
+      <div aria-live="polite" className="mb-3 empty:hidden">
+        {sending && slow ? <SlowNotice /> : null}
+      </div>
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onCancel} disabled={sending} data-autofocus="true">
           Cancel

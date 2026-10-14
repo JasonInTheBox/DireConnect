@@ -19,6 +19,12 @@ describe("whenLabel", () => {
     ).toMatch(/^Planned for Feb 1, 2030/);
   });
 
+  it("does not call a draft with a send time in the past planned", () => {
+    expect(
+      whenLabel({ status: "DRAFT", sendAt: "2030-01-01T09:30:00.000Z", updatedAt }, now, "UTC"),
+    ).toBe("Not scheduled");
+  });
+
   it("says a queued campaign without a future time is waiting to be sent", () => {
     expect(whenLabel({ status: "QUEUED", sendAt: null, updatedAt }, now, "UTC")).toBe(
       "Waiting to be sent",

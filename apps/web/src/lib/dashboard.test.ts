@@ -150,14 +150,19 @@ describe("setupSteps", () => {
 });
 
 describe("campaignHref", () => {
-  it("opens drafts in the preview and everything else in the analytics view", () => {
-    expect(campaignHref("b1", { id: "c9", status: "DRAFT" })).toBe(
+  it("opens email drafts in the wizard, SMS drafts in the preview and everything else in the analytics view", () => {
+    expect(campaignHref("b1", { id: "c9", status: "DRAFT", channel: "EMAIL" })).toBe(
+      "/businesses/b1/campaigns/c9/edit",
+    );
+    expect(campaignHref("b1", { id: "c9", status: "DRAFT", channel: "SMS" })).toBe(
       "/businesses/b1/campaigns/c9/preview",
     );
-    for (const status of ["QUEUED", "SENT", "FAILED"] as const) {
-      expect(campaignHref("b1", { id: "c9", status })).toBe(
-        "/businesses/b1/campaigns/c9/analytics",
-      );
+    for (const channel of ["EMAIL", "SMS"] as const) {
+      for (const status of ["QUEUED", "SENT", "FAILED"] as const) {
+        expect(campaignHref("b1", { id: "c9", status, channel })).toBe(
+          "/businesses/b1/campaigns/c9/analytics",
+        );
+      }
     }
   });
 });

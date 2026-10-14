@@ -75,6 +75,9 @@ export function campaignPayload(values: WizardValues) {
   };
 }
 
+/** Why a send did not go through, and whether the draft is known to be intact. */
+export type SendFailure = { message: string; draftSaved: boolean };
+
 export type SendBlock = {
   code: "no-recipients" | "over-limit" | "email-unconfirmed";
   title: string;
@@ -114,7 +117,7 @@ export function sendBlocks({
       code: "email-unconfirmed",
       title: "Confirm your email address first",
       message:
-        "Campaigns can only be sent from accounts with a confirmed email address. Open the confirmation email we sent you, then reload this page.",
+        "Campaigns can only be sent from accounts with a confirmed email address. Open the confirmation email we sent you, then come back to Campaigns and open this draft again.",
     });
   }
 

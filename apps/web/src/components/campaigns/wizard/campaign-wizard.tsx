@@ -19,6 +19,7 @@ import {
   canSaveDraft,
   confirmCopy,
   sendBlocks,
+  type SendFailure,
   submitLabel,
   successMessage,
   validateStep,
@@ -31,6 +32,11 @@ import { focusFirstInvalid, splitFieldErrors } from "@/lib/forms";
 import { formatDateTime, localInputToIso } from "@/lib/schedule";
 import type { Campaign, CampaignPreviewResponse, DashboardResponse } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
+
+const COULD_NOT_CONFIRM =
+  "We couldn’t confirm whether the campaign was sent. Check Campaigns before trying again.";
+const CAMPAIGN_GONE =
+  "We couldn’t find this campaign any more. Check Campaigns before trying again.";
 
 /** Server field errors belong to the step that shows the field. */
 const FIELD_STEP: Record<string, WizardStepId> = { title: "basics", message: "message" };
@@ -62,7 +68,10 @@ export function CampaignWizard({
   const session = useSession();
   const [confirming, setConfirming] = useState(false);
   const [sending, setSending] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<SendFailure | null>(null);
+  // Latched after a successful queue so nothing can act on the draft while navigation completes.
+  const [sent, setSent] = useState(false);
+  const sentRef = useRef(false);
   const sendErrorRef = useRef<HTMLDivElement>(null);
 
   const step = WIZARD_STEPS[stepIndex].id;
@@ -144,7 +153,7 @@ export function CampaignWizard({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (inFlight.current) {
+    if (inFlight.current || sentRef.current) {
       return;
     }
 
@@ -193,7 +202,7 @@ export function CampaignWizard({
   }
 
   async function handleSaveDraft() {
-    if (inFlight.current || !canSaveDraft(values)) {
+    if (inFlight.current || sentRef.current || !canSaveDraft(values)) {
       return;
     }
     inFlight.current = true;
@@ -211,8 +220,40 @@ export function CampaignWizard({
     }
   }
 
+  /** The campaign is queued: latch, announce and leave. Never runs twice. */
+  function completeSend(id: string) {
+    sentRef.current = true;
+    setSent(true);
+    setConfirming(false);
+    setSendError(null);
+    toast.success(successMessage(values.timing));
+    router.push(`/businesses/${businessId}/campaigns/${id}/analytics`);
+  }
+
+  /**
+   * A lost response, a server error or a missing campaign does not say whether the queue step
+   * ran, so ask the list before telling the user anything.
+   */
+  async function resolveAmbiguousFailure(id: string, message: string) {
+    try {
+      const campaigns = await apiFetch<Campaign[]>(`/api/businesses/${businessId}/campaigns`);
+      const current = campaigns.find((item) => item.id === id);
+      if (current && current.status !== "DRAFT") {
+        completeSend(id);
+        return;
+      }
+      setConfirming(false);
+      setSendError(
+        current ? { message, draftSaved: true } : { message: CAMPAIGN_GONE, draftSaved: false },
+      );
+    } catch {
+      setConfirming(false);
+      setSendError({ message: COULD_NOT_CONFIRM, draftSaved: false });
+    }
+  }
+
   async function handleSend() {
-    if (inFlight.current || !draftId) {
+    if (inFlight.current || sentRef.current || !draftId) {
       return;
     }
     // The chosen time may have passed while the confirm dialog was open.
@@ -226,19 +267,33 @@ export function CampaignWizard({
 
     inFlight.current = true;
     setSending(true);
+    let stage: "save" | "queue" = "save";
     try {
       const base = `/api/businesses/${businessId}/campaigns/${draftId}`;
       // The queue step reads the stored send time, so save the chosen timing first.
       await apiFetch<Campaign>(base, { method: "PUT", body: campaignPayload(values) });
+      stage = "queue";
       await apiFetch(`${base}/queue`, { method: "POST" });
-      setConfirming(false);
-      toast.success(successMessage(values.timing));
-      router.push(`/businesses/${businessId}/campaigns/${draftId}/analytics`);
+      completeSend(draftId);
     } catch (error) {
-      setConfirming(false);
-      setSendError(
-        error instanceof ApiError ? error.message : "Could not send the campaign. Try again.",
-      );
+      const message =
+        error instanceof ApiError ? error.message : "Could not send the campaign. Try again.";
+      const ambiguous =
+        !(error instanceof ApiError) ||
+        error.status === 0 ||
+        error.status >= 500 ||
+        (stage === "save" && error.status === 404);
+
+      if (ambiguous) {
+        await resolveAmbiguousFailure(draftId, message);
+      } else {
+        if (error instanceof ApiError && error.status === 409) {
+          // The refusal is about who can receive it; bring the numbers and blocks up to date.
+          preview.refetch();
+        }
+        setConfirming(false);
+        setSendError({ message, draftSaved: true });
+      }
     } finally {
       inFlight.current = false;
       setSending(false);
@@ -246,6 +301,9 @@ export function CampaignWizard({
   }
 
   function handleBack() {
+    if (sentRef.current) {
+      return;
+    }
     setSendError(null);
     setFormError(null);
     setErrors({});
@@ -321,7 +379,7 @@ export function CampaignWizard({
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           {stepIndex > 0 ? (
-            <Button variant="ghost" onClick={handleBack} disabled={busy !== null}>
+            <Button variant="ghost" onClick={handleBack} disabled={busy !== null || sent}>
               Back
             </Button>
           ) : (
@@ -335,7 +393,7 @@ export function CampaignWizard({
               variant="secondary"
               onClick={handleSaveDraft}
               loading={busy === "draft"}
-              disabled={busy === "review" || !canSaveDraft(values)}
+              disabled={busy === "review" || sent || !canSaveDraft(values)}
             >
               Save draft
             </Button>
@@ -352,7 +410,7 @@ export function CampaignWizard({
               <Button
                 type="submit"
                 variant="primary"
-                disabled={!canSend || busy !== null || sending}
+                disabled={!canSend || busy !== null || sending || sent}
               >
                 {submitLabel(values.timing)}
               </Button>

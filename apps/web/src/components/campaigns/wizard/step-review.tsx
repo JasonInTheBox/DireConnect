@@ -2,7 +2,7 @@ import { type RefObject } from "react";
 import { RecipientSummary, type PreviewState } from "./recipient-summary";
 import { Button } from "@/components/ui/button";
 import { TextField } from "@/components/ui/field";
-import type { SendBlock, WizardValues } from "@/lib/campaignWizard";
+import type { SendBlock, SendFailure, WizardValues } from "@/lib/campaignWizard";
 import { localTimeZoneLabel, toLocalInput } from "@/lib/schedule";
 
 function TimingOption({
@@ -57,7 +57,7 @@ export function StepReview({
   onChange: <K extends keyof WizardValues>(key: K, value: WizardValues[K]) => void;
   preview: PreviewState;
   blocks: SendBlock[];
-  sendError: string | null;
+  sendError: SendFailure | null;
   sendErrorRef: RefObject<HTMLDivElement | null>;
   onRecheck: () => void;
 }) {
@@ -138,11 +138,13 @@ export function StepReview({
           className="rounded-control border border-danger bg-danger-soft px-3 py-2.5 text-sm focus:outline-none"
         >
           <p className="font-medium text-danger">The campaign wasn’t sent</p>
-          <p className="mt-0.5 text-ink">{sendError}</p>
-          <p className="mt-1 text-muted">
-            Your draft is saved. Fix the problem and try again, or save the draft and come back
-            later.
-          </p>
+          <p className="mt-0.5 text-ink">{sendError.message}</p>
+          {sendError.draftSaved ? (
+            <p className="mt-1 text-muted">
+              Your draft is saved. Fix the problem and try again, or save the draft and come back
+              later.
+            </p>
+          ) : null}
         </div>
       ) : null}
 

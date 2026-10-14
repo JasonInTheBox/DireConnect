@@ -25,8 +25,11 @@ export function whenLabel(
   const sendAt = campaign.sendAt ? formatDateTime(campaign.sendAt, timeZone) : "";
 
   switch (key) {
-    case "DRAFT":
-      return sendAt ? `Planned for ${sendAt}` : "Not scheduled";
+    case "DRAFT": {
+      // A send time that has already passed is not a plan: the draft opens as Send now.
+      const planned = campaign.sendAt && new Date(campaign.sendAt).getTime() > now.getTime();
+      return planned ? `Planned for ${sendAt}` : "Not scheduled";
+    }
     case "QUEUED":
       return "Waiting to be sent";
     case "SCHEDULED":

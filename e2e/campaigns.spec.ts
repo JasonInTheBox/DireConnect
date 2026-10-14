@@ -124,12 +124,21 @@ test.describe("campaign list", () => {
   });
 
   test("links each row to its detail page and offers the wizard when empty", async ({ page }) => {
-    await mockApi(page, { businesses: [bakery], campaigns: { b1: [draft, sent] }, analytics });
+    await mockApi(page, {
+      businesses: [bakery],
+      campaigns: { b1: [draft, sent, legacySms] },
+      analytics,
+    });
     await page.goto("/businesses/b1/campaigns");
 
+    // Email drafts open in the wizard, never in the legacy one-click Queue page.
     await expect(page.getByRole("link", { name: "Spring menu" })).toHaveAttribute(
       "href",
-      "/businesses/b1/campaigns/k-1/preview",
+      "/businesses/b1/campaigns/k-1/edit",
+    );
+    await expect(page.getByRole("link", { name: "Text blast" })).toHaveAttribute(
+      "href",
+      "/businesses/b1/campaigns/k-6/preview",
     );
     await expect(page.getByRole("link", { name: "Loyalty thanks" })).toHaveAttribute(
       "href",

@@ -56,7 +56,12 @@ test.describe("campaign wizard: steps", () => {
 
     await page.getByRole("textbox", { name: "Message" }).fill("Fresh pumpkin loaves are in.\nCome say hi.");
     const preview = page.getByRole("region", { name: "Email preview" });
-    await expect(preview).toContainText("Corner Bakery");
+    // The email is sent from DireConnect's address; the business name is in the header and
+    // the opt-in line, and there is no sender row naming the business.
+    await expect(preview).toContainText("Promotion from Corner Bakery");
+    await expect(preview).toContainText("opted in to promotions from Corner Bakery");
+    await expect(preview).toContainText("Powered by DireConnect");
+    await expect(preview.getByText("From", { exact: true })).toHaveCount(0);
     await expect(preview).toContainText("Autumn menu");
     await expect(preview).toContainText("Fresh pumpkin loaves are in.");
     await expect(preview).toContainText("unsubscribe link");
@@ -571,5 +576,202 @@ test.describe("campaign wizard: unconfirmed email", () => {
 
     await expect(page.getByText("Confirm your email address first")).toBeVisible();
     await expect(page.getByRole("button", { name: "Send now" })).toBeDisabled();
+  });
+});
+
+const cors = { "access-control-allow-origin": "*" };
+
+test.describe("campaign wizard: ambiguous and repeated sends", () => {
+  test.beforeEach(async ({ page }) => {
+    await signIn(page);
+  });
+
+  async function confirmSend(page: import("@playwright/test").Page) {
+    await page.getByRole("button", { name: "Send now" }).click();
+    await page
+      .getByRole("dialog", { name: "Send to 2 customers now?" })
+      .getByRole("button", { name: "Send now" })
+      .click();
+  }
+
+  test("a lost queue response that actually queued the campaign is treated as sent", async ({
+    page,
+  }) => {
+    const state = await mockApi(page, { businesses: [bakery], customers: { b1: people } });
+    await reachReview(page);
+
+    // The server queues the campaign, but the response never reaches the browser.
+    await page.route("**/api/businesses/b1/campaigns/n-2000/queue", async (route) => {
+      if (route.request().method() !== "POST") {
+        return route.fallback();
+      }
+      const draft = state.campaigns.b1.find((item) => item.id === "n-2000");
+      if (draft) {
+        draft.status = "QUEUED";
+      }
+      return route.abort();
+    });
+
+    await confirmSend(page);
+
+    await expect(page).toHaveURL(/\/businesses\/b1\/campaigns\/n-2000\/analytics$/);
+    await expect(page.getByText("Campaign queued")).toBeVisible();
+    await expect(page.getByText("The campaign wasn’t sent")).toHaveCount(0);
+  });
+
+  test("a 404 on the timing save after the campaign was queued is treated as sent", async ({
+    page,
+  }) => {
+    const state = await mockApi(page, { businesses: [bakery], customers: { b1: people } });
+    await reachReview(page);
+
+    await page.route("**/api/businesses/b1/campaigns/n-2000", async (route) => {
+      if (route.request().method() !== "PUT") {
+        return route.fallback();
+      }
+      const draft = state.campaigns.b1.find((item) => item.id === "n-2000");
+      if (draft) {
+        draft.status = "QUEUED";
+      }
+      return route.fulfill({
+        status: 404,
+        headers: cors,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: "Campaign not found. Queued or sent campaigns cannot be edited.",
+        }),
+      });
+    });
+
+    await confirmSend(page);
+
+    await expect(page).toHaveURL(/\/campaigns\/n-2000\/analytics$/);
+    await expect(page.getByText("The campaign wasn’t sent")).toHaveCount(0);
+  });
+
+  test("after a successful send nothing on the Review step can be used while navigation completes", async ({
+    page,
+  }) => {
+    const state = await mockApi(page, { businesses: [bakery], customers: { b1: people } });
+    await reachReview(page);
+
+    // Hold the navigation so the Review step is still on screen after the queue succeeds.
+    await page.route("**/campaigns/n-2000/analytics?*", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+      return route.continue();
+    });
+
+    await confirmSend(page);
+    await expect(page.getByText("Campaign queued")).toBeVisible();
+
+    await expect(page.getByRole("button", { name: "Send now" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Save draft" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Back" })).toBeDisabled();
+    await expect(page.getByText("The campaign wasn’t sent")).toHaveCount(0);
+
+    await expect(page).toHaveURL(/\/analytics$/);
+    const queues = state.requests.filter((request) => request.path.endsWith("/queue"));
+    expect(queues).toHaveLength(1);
+  });
+
+  test("a server error on queue with the draft still a draft shows the panel", async ({ page }) => {
+    const state = await mockApi(page, { businesses: [bakery], customers: { b1: people } });
+    await reachReview(page);
+
+    await page.route("**/api/businesses/b1/campaigns/n-2000/queue", async (route) => {
+      if (route.request().method() !== "POST") {
+        return route.fallback();
+      }
+      return route.fulfill({
+        status: 503,
+        headers: cors,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Service unavailable." }),
+      });
+    });
+
+    await confirmSend(page);
+
+    const panel = page.getByRole("alert").filter({ hasText: "The campaign wasn’t sent" });
+    await expect(panel).toContainText("Service unavailable.");
+    await expect(panel).toContainText("Your draft is saved");
+    await expect(page).toHaveURL(/\/campaigns\/new$/);
+
+    // The wizard checked the list before reporting the failure.
+    const listReads = state.requests.filter(
+      (request) => request.method === "GET" && request.path === "/api/businesses/b1/campaigns",
+    );
+    expect(listReads.length).toBeGreaterThan(0);
+  });
+
+  test("says so, without claiming the draft is saved, when it cannot confirm what happened", async ({
+    page,
+  }) => {
+    await mockApi(page, { businesses: [bakery], customers: { b1: people } });
+    await reachReview(page);
+
+    await page.route("**/api/businesses/b1/campaigns/n-2000/queue", (route) =>
+      route.request().method() === "POST" ? route.abort() : route.fallback(),
+    );
+    await page.route("**/api/businesses/b1/campaigns", (route) =>
+      route.request().method() === "GET"
+        ? route.fulfill({
+            status: 500,
+            headers: cors,
+            contentType: "application/json",
+            body: JSON.stringify({ error: "Could not load campaigns." }),
+          })
+        : route.fallback(),
+    );
+
+    await confirmSend(page);
+
+    const panel = page.getByRole("alert").filter({ hasText: "The campaign wasn’t sent" });
+    await expect(panel).toContainText(
+      "We couldn’t confirm whether the campaign was sent. Check Campaigns before trying again.",
+    );
+    await expect(panel).not.toContainText("Your draft is saved");
+    await expect(page).toHaveURL(/\/campaigns\/new$/);
+  });
+
+  test("a refusal about recipients refreshes the recipient numbers", async ({ page }) => {
+    const state = await mockApi(page, {
+      businesses: [bakery],
+      customers: { b1: people },
+      queueError: { status: 409, error: "This campaign has no eligible, opted-in email recipients." },
+    });
+    await reachReview(page);
+
+    const previewReads = () =>
+      state.requests.filter(
+        (request) => request.method === "GET" && request.path.endsWith("/n-2000/preview"),
+      ).length;
+    const before = previewReads();
+    expect(before).toBeGreaterThan(0);
+
+    await confirmSend(page);
+
+    const panel = page.getByRole("alert").filter({ hasText: "The campaign wasn’t sent" });
+    await expect(panel).toContainText("no eligible, opted-in email recipients");
+    await expect(panel).toContainText("Your draft is saved");
+    await expect.poll(previewReads).toBeGreaterThan(before);
+  });
+
+  test("explains the wait when confirming takes longer than usual", async ({ page }) => {
+    test.setTimeout(60_000);
+    await mockApi(page, {
+      businesses: [bakery],
+      customers: { b1: people },
+      delayWritesMs: 5_000,
+    });
+    await reachReview(page);
+
+    await page.getByRole("button", { name: "Send now" }).click();
+    const dialog = page.getByRole("dialog", { name: "Send to 2 customers now?" });
+    await expect(dialog).not.toContainText("Waking up the server");
+    await dialog.getByRole("button", { name: "Send now" }).click();
+
+    await expect(dialog).toContainText("Waking up the server", { timeout: 8_000 });
+    await expect(page).toHaveURL(/\/analytics$/, { timeout: 20_000 });
   });
 });

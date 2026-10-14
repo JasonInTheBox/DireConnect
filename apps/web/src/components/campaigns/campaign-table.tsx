@@ -124,7 +124,7 @@ export function CampaignTable({
         </Table>
       </div>
 
-      <ul className="space-y-2 xl:hidden">
+      <ul aria-label="Campaigns" className="space-y-2 xl:hidden">
         {campaigns.map((campaign) => (
           <li key={campaign.id} className="rounded-container border border-line bg-surface p-4">
             <div className="flex items-start justify-between gap-2">
