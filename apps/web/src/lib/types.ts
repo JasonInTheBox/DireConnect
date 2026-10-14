@@ -52,3 +52,59 @@ export type DashboardResponse = {
   summary: DashboardSummary;
   recentCampaigns: DashboardCampaign[];
 };
+
+export type Campaign = {
+  id: string;
+  ownerId: string;
+  businessId: string;
+  title: string;
+  message: string;
+  channel: CampaignChannel;
+  status: CampaignStatus;
+  sendAt?: string | null;
+  targetAudience: CampaignAudience;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CampaignAnalyticsSummary = {
+  analyticsSource: "SNAPSHOT" | "LEGACY_LOGS";
+  hasSnapshot: boolean;
+  totalSnapshotCount: number;
+  totalRecipientCount: number;
+  eligibleCount: number;
+  skippedBeforeSendCount: number;
+  attemptedSendCount: number;
+  sentCount: number;
+  failedDeliveryCount: number;
+  pendingCount: number;
+  totalLogCount: number;
+  sentRate: number | null;
+  skippedByReason: Record<string, number>;
+  failedByReason: Record<string, number>;
+};
+
+export type CampaignAnalyticsResponse = {
+  campaign: Pick<Campaign, "id" | "title" | "channel" | "targetAudience" | "status">;
+  summary: CampaignAnalyticsSummary;
+};
+
+export type PreviewRecipient = {
+  customerId: string;
+  recipient: string | null;
+  eligible: boolean;
+  reason: string | null;
+};
+
+export type CampaignPreviewResponse = {
+  campaign: Pick<Campaign, "id" | "title" | "channel" | "targetAudience" | "status">;
+  summary: {
+    totalCustomers: number;
+    eligibleCount: number;
+    skippedCount: number;
+    skippedByReason: Record<string, number>;
+    isSnapshot: boolean;
+  };
+  eligible: PreviewRecipient[];
+  skipped: PreviewRecipient[];
+};
