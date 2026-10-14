@@ -139,6 +139,32 @@ test.describe("dashboard", () => {
     await expect(recent.getByText("Flash offer")).toBeVisible();
   });
 
+  test("Not opted in is derived from the totals, not from the API's unsubscribed count", async ({
+    page,
+  }) => {
+    // total 4, emailOptedIn 2, but the API's `unsubscribed` is 1: the numbers must diverge.
+    const diverging = [
+      customer("d-1", "Opted1", { email: "d1@example.com", emailOptIn: true }),
+      customer("d-2", "Opted2", { email: "d2@example.com", emailOptIn: true }),
+      // Legacy row: never opted in and not marked unsubscribed.
+      customer("d-3", "Legacy", { emailOptIn: false, unsubscribedAt: null }),
+      // Opted in, then unsubscribed.
+      customer("d-4", "Left", {
+        email: "d4@example.com",
+        emailOptIn: true,
+        unsubscribedAt: "2026-09-01T00:00:00Z",
+      }),
+    ];
+    await mockApi(page, { businesses: [bakery], customers: { b1: diverging } });
+    await page.goto("/businesses/b1/dashboard");
+
+    const customers = page.getByRole("region", { name: "Customers" });
+    await expect(customers).toContainText("4 customers");
+    await expect(customers.locator("div").filter({ hasText: /^Opted in to email2$/ })).toBeVisible();
+    await expect(customers.locator("div").filter({ hasText: /^Not opted in2$/ })).toBeVisible();
+    await expect(customers.locator("div").filter({ hasText: /^Not opted in1$/ })).toHaveCount(0);
+  });
+
   test("a tiny failed share stays visible in the bar and the legend", async ({ page }) => {
     await mockApi(page, {
       businesses: [bakery],
