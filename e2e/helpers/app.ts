@@ -77,6 +77,27 @@ export async function signIn(page: Page) {
 
 export type RecordedRequest = { method: string; path: string; body: unknown };
 
+export type MockRecentCampaign = {
+  id: string;
+  title: string;
+  channel: "EMAIL" | "SMS";
+  targetAudience: "ALL" | "EMAIL_OPTED_IN" | "SMS_OPTED_IN";
+  status: "DRAFT" | "QUEUED" | "SENT" | "FAILED";
+  createdAt: string;
+};
+
+export type MockDashboardData = {
+  campaigns?: Partial<{ total: number; draft: number; queued: number; sent: number; failed: number }>;
+  messages?: Partial<{
+    totalLogs: number;
+    sent: number;
+    failed: number;
+    pending: number;
+    successRate: number | null;
+  }>;
+  recentCampaigns?: MockRecentCampaign[];
+};
+
 type ApiMockOptions = {
   businesses: MockBusiness[];
   /** Customers per business id. */
@@ -89,17 +110,42 @@ type ApiMockOptions = {
   failFirstCustomersGet?: boolean;
   /** Makes the first DELETE request (business or customer) fail with a 500. */
   failFirstDelete?: boolean;
+  /** Dashboard extras per business id (campaign counts, message counts, recent campaigns). */
+  dashboards?: Record<string, MockDashboardData>;
+  /** Makes the first dashboard request fail with a 500. */
+  failFirstDashboardGet?: boolean;
 };
 
-function emptyDashboard(target: MockBusiness) {
+function dashboardFor(
+  target: MockBusiness,
+  customers: MockCustomer[],
+  extra: MockDashboardData = {},
+) {
+  const campaigns = { total: 0, draft: 0, queued: 0, sent: 0, failed: 0, ...extra.campaigns };
+  const messages = {
+    totalLogs: 0,
+    sent: 0,
+    failed: 0,
+    pending: 0,
+    successRate: null as number | null,
+    ...extra.messages,
+  };
+
   return {
     business: target,
     summary: {
-      customers: { total: 0, emailOptedIn: 0, smsOptedIn: 0, unsubscribed: 0 },
-      campaigns: { total: 0, draft: 0, queued: 0, sent: 0, failed: 0 },
-      messages: { totalLogs: 0, sent: 0, failed: 0, pending: 0, successRate: null },
+      customers: {
+        total: customers.length,
+        // Mirrors the API: opted in means consent and no unsubscribe.
+        emailOptedIn: customers.filter((item) => item.emailOptIn && !item.unsubscribedAt).length,
+        smsOptedIn: customers.filter((item) => item.smsOptIn && !item.unsubscribedAt).length,
+        // The API counts everyone with `unsubscribedAt`, including people who never opted in.
+        unsubscribed: customers.filter((item) => item.unsubscribedAt).length,
+      },
+      campaigns,
+      messages,
     },
-    recentCampaigns: [],
+    recentCampaigns: extra.recentCampaigns ?? [],
   };
 }
 
@@ -118,6 +164,7 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
     nextCustomerId: 1000,
     customersGetFailed: false,
     deleteFailed: false,
+    dashboardGetFailed: false,
   };
 
   // The Supabase client may try to reach its (fake) host; keep it quiet and offline.
@@ -195,8 +242,14 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
 
     const dashboard = url.pathname.match(/^\/api\/businesses\/([^/]+)\/dashboard$/);
     if (dashboard) {
+      if (options.failFirstDashboardGet && !state.dashboardGetFailed) {
+        state.dashboardGetFailed = true;
+        return json(500, { error: "Dashboard unavailable" });
+      }
       const match = state.businesses.find((candidate) => candidate.id === dashboard[1]);
-      return match ? json(200, emptyDashboard(match)) : json(404, { error: "Business not found" });
+      return match
+        ? json(200, dashboardFor(match, state.customers[match.id] ?? [], options.dashboards?.[match.id]))
+        : json(404, { error: "Business not found" });
     }
 
     const customerRoute = url.pathname.match(/^\/api\/businesses\/([^/]+)\/customers(?:\/([^/]+))?$/);
