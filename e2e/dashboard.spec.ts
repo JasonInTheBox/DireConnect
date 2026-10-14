@@ -65,8 +65,8 @@ test.describe("dashboard", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Dashboard" })).toBeVisible();
     const checklist = page.getByRole("region", { name: "Get started" });
     await expect(checklist).toBeVisible();
-    await expect(checklist.getByText("Add your first customer")).toBeVisible();
-    await expect(checklist.getByText("Send your first campaign")).toBeVisible();
+    await expect(checklist.getByText("Add your first customer", { exact: true })).toBeVisible();
+    await expect(checklist.getByText("Send your first campaign", { exact: true })).toBeVisible();
 
     await expect(page.getByRole("region", { name: "Customers" })).toContainText("0 customers");
     await expect(page.getByRole("region", { name: "Delivery" })).toContainText("No messages sent yet");
@@ -92,6 +92,25 @@ test.describe("dashboard", () => {
     await expect(checklist.getByRole("listitem").first()).toContainText("(done)");
     // The campaign step is still open, so the checklist stays.
     await expect(checklist).toBeVisible();
+  });
+
+  test("keeps keyboard focus on the page title after adding the first customer", async ({
+    page,
+  }) => {
+    await mockApi(page, { businesses: [bakery] });
+    await page.goto("/businesses/b1/dashboard");
+
+    // The checklist button unmounts once the dashboard refetches; focus must not fall to <body>.
+    const checklist = page.getByRole("region", { name: "Get started" });
+    await checklist.getByRole("button", { name: "Add customer" }).focus();
+    await page.keyboard.press("Enter");
+    const dialog = page.getByRole("dialog", { name: "Add customer" });
+    await dialog.getByLabel("First name").fill("Katherine");
+    await page.keyboard.press("Enter");
+
+    await expect(page.getByText("Customer added")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Customers" })).toContainText("1 customer");
+    await expect(page.getByRole("heading", { level: 1, name: "Dashboard" })).toBeFocused();
   });
 
   test("shows customers, campaigns, delivery and recent campaigns from real numbers", async ({
@@ -125,6 +144,7 @@ test.describe("dashboard", () => {
     const delivery = page.getByRole("region", { name: "Delivery" });
     await expect(page.getByRole("img", { name: "Messages: 8 sent, 1 failed, 1 pending" })).toBeVisible();
     await expect(delivery).toContainText("89% success rate");
+    await expect(delivery).toContainText("pending messages not counted");
     await expect(delivery.locator("div").filter({ hasText: /^Sent8 \(80%\)$/ })).toBeVisible();
 
     const recent = page.getByRole("region", { name: "Recent campaigns" });
@@ -186,8 +206,12 @@ test.describe("dashboard", () => {
     expect(box?.width ?? 0).toBeGreaterThanOrEqual(3.5);
 
     const delivery = page.getByRole("region", { name: "Delivery" });
-    await expect(delivery.locator("div").filter({ hasText: /^Failed1 \(0%\)$/ })).toBeVisible();
+    await expect(delivery.locator("div").filter({ hasText: /^Sent1000 \(>99%\)$/ })).toBeVisible();
+    await expect(delivery.locator("div").filter({ hasText: /^Failed1 \(<1%\)$/ })).toBeVisible();
     await expect(delivery.locator("div").filter({ hasText: /^Pending0 \(0%\)$/ })).toBeVisible();
+    // Computed from the counts, so it cannot read 100% beside a failure (the API said 100).
+    await expect(delivery).toContainText(">99% success rate");
+    await expect(delivery).not.toContainText("100% success rate");
   });
 
   test("quick actions open the customer dialog and the campaigns page", async ({ page }) => {

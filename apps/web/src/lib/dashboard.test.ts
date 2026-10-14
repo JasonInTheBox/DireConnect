@@ -5,6 +5,7 @@ import {
   formatDate,
   notOptedInCount,
   setupSteps,
+  shareLabel,
   showSetupChecklist,
   successRateLabel,
 } from "./dashboard";
@@ -32,40 +33,74 @@ describe("notOptedInCount", () => {
   });
 });
 
+describe("shareLabel", () => {
+  it("is 0% only when the count is zero (or there is no total)", () => {
+    expect(shareLabel(0, 10)).toBe("0%");
+    expect(shareLabel(0, 0)).toBe("0%");
+    expect(shareLabel(5, 0)).toBe("0%");
+  });
+
+  it("is 100% only when the count is the whole total", () => {
+    expect(shareLabel(10, 10)).toBe("100%");
+  });
+
+  it("rounds ordinary shares to a whole percent", () => {
+    expect(shareLabel(5, 10)).toBe("50%");
+    expect(shareLabel(1, 3)).toBe("33%");
+  });
+
+  it("never rounds a non-zero share down to 0% or a partial share up to 100%", () => {
+    expect(shareLabel(1, 1000)).toBe("<1%");
+    expect(shareLabel(4, 1000)).toBe("<1%");
+    expect(shareLabel(999, 1000)).toBe(">99%");
+    expect(shareLabel(995, 1000)).toBe(">99%");
+    expect(shareLabel(994, 1000)).toBe("99%");
+    expect(shareLabel(5, 1000)).toBe("1%");
+  });
+});
+
 describe("deliverySegments", () => {
   it("returns nothing when no messages exist, so the page shows the empty message", () => {
     expect(deliverySegments({ sent: 0, failed: 0, pending: 0 })).toEqual([]);
   });
 
-  it("returns every state, including zeros, with counts and percentages", () => {
+  it("returns every state, including zeros, with counts, percentages and share labels", () => {
     expect(deliverySegments({ sent: 8, failed: 1, pending: 1 })).toEqual([
-      { key: "sent", label: "Sent", count: 8, percent: 80 },
-      { key: "failed", label: "Failed", count: 1, percent: 10 },
-      { key: "pending", label: "Pending", count: 1, percent: 10 },
+      { key: "sent", label: "Sent", count: 8, percent: 80, share: "80%" },
+      { key: "failed", label: "Failed", count: 1, percent: 10, share: "10%" },
+      { key: "pending", label: "Pending", count: 1, percent: 10, share: "10%" },
     ]);
     expect(deliverySegments({ sent: 5, failed: 0, pending: 0 })).toEqual([
-      { key: "sent", label: "Sent", count: 5, percent: 100 },
-      { key: "failed", label: "Failed", count: 0, percent: 0 },
-      { key: "pending", label: "Pending", count: 0, percent: 0 },
+      { key: "sent", label: "Sent", count: 5, percent: 100, share: "100%" },
+      { key: "failed", label: "Failed", count: 0, percent: 0, share: "0%" },
+      { key: "pending", label: "Pending", count: 0, percent: 0, share: "0%" },
     ]);
   });
 
-  it("keeps a tiny share visible in the numbers", () => {
+  it("keeps a tiny share visible in the numbers and never reads 100% beside a failure", () => {
     const tiny = deliverySegments({ sent: 1000, failed: 1, pending: 0 });
     expect(tiny[1]).toMatchObject({ key: "failed", count: 1 });
     expect(tiny[1].percent).toBeGreaterThan(0);
+    expect(tiny.map((segment) => segment.share)).toEqual([">99%", "<1%", "0%"]);
   });
 });
 
 describe("successRateLabel", () => {
-  it("is null when there is no rate", () => {
-    expect(successRateLabel(null)).toBeNull();
+  it("is null when nothing has finished (no messages, or only pending ones)", () => {
+    expect(successRateLabel({ sent: 0, failed: 0, pending: 0 })).toBeNull();
+    expect(successRateLabel({ sent: 0, failed: 0, pending: 3 })).toBeNull();
   });
 
-  it("rounds to a whole percent", () => {
-    expect(successRateLabel(89)).toBe("89% success rate");
-    expect(successRateLabel(66.67)).toBe("67% success rate");
-    expect(successRateLabel(0)).toBe("0% success rate");
+  it("is sent / (sent + failed) and says when pending messages are not counted", () => {
+    expect(successRateLabel({ sent: 8, failed: 1, pending: 1 })).toBe(
+      "89% success rate (pending messages not counted)",
+    );
+    expect(successRateLabel({ sent: 5, failed: 0, pending: 0 })).toBe("100% success rate");
+  });
+
+  it("never reads 100% while a message failed, or 0% while one succeeded", () => {
+    expect(successRateLabel({ sent: 1000, failed: 1, pending: 0 })).toBe(">99% success rate");
+    expect(successRateLabel({ sent: 1, failed: 1000, pending: 0 })).toBe("<1% success rate");
   });
 });
 

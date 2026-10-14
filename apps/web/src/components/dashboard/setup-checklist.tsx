@@ -22,7 +22,7 @@ export function SetupChecklist({
       <h2 id="setup-heading" className="text-base font-semibold text-ink">
         Get started
       </h2>
-      <p className="mt-1 text-sm text-muted">Two steps to your first campaign.</p>
+      <p className="mt-1 text-sm text-muted">Finish setting up to send your first campaign.</p>
 
       <ol className="mt-4 divide-y divide-line">
         {steps.map((step) => (

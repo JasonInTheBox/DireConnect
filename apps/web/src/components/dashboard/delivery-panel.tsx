@@ -14,7 +14,7 @@ const STYLE: Record<DeliverySegment["key"], { fill: string; icon: IconName; icon
 export function DeliveryPanel({ messages }: { messages: DashboardSummary["messages"] }) {
   const segments = deliverySegments(messages);
   const drawn = segments.filter((segment) => segment.count > 0);
-  const rate = successRateLabel(messages.successRate);
+  const rate = successRateLabel(messages);
 
   return (
     <Panel id="delivery-heading" title="Delivery">
@@ -34,7 +34,7 @@ export function DeliveryPanel({ messages }: { messages: DashboardSummary["messag
             {drawn.map((segment, index) => (
               <div
                 key={segment.key}
-                title={`${segment.label}: ${segment.count} (${Math.round(segment.percent)}%)`}
+                title={`${segment.label}: ${segment.count} (${segment.share})`}
                 className={cn(
                   "min-w-1",
                   STYLE[segment.key].fill,
@@ -49,17 +49,17 @@ export function DeliveryPanel({ messages }: { messages: DashboardSummary["messag
           <dl className="mt-4 grid gap-2 sm:grid-cols-3">
             {segments.map((segment) => (
               <div key={segment.key} className="flex items-center gap-2 text-sm">
-                <span
-                  aria-hidden="true"
-                  className={cn("h-2.5 w-2.5 shrink-0 rounded-[3px]", STYLE[segment.key].fill)}
-                />
-                <dt className="flex items-center gap-1 font-medium text-ink">
+                <dt className="flex items-center gap-2 font-medium text-ink">
+                  <span
+                    aria-hidden="true"
+                    className={cn("h-2.5 w-2.5 shrink-0 rounded-[3px]", STYLE[segment.key].fill)}
+                  />
                   <Icon name={STYLE[segment.key].icon} className={STYLE[segment.key].iconColor} />
                   {segment.label}
                 </dt>
                 <dd className="ml-auto text-ink sm:ml-0">
                   <span className="font-semibold">{segment.count}</span>{" "}
-                  <span className="text-muted">({Math.round(segment.percent)}%)</span>
+                  <span className="text-muted">({segment.share})</span>
                 </dd>
               </div>
             ))}

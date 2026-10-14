@@ -103,6 +103,22 @@ test.describe("customers page", () => {
     await expect(dialog.getByLabel("First name")).toBeFocused();
   });
 
+  test("keeps keyboard focus on the page title after adding the first customer", async ({ page }) => {
+    await mockApi(page, { businesses: [bakery] });
+    await page.goto("/businesses/b1/customers");
+
+    // The empty-state button unmounts once the list refetches; focus must not fall to <body>.
+    await page.getByRole("button", { name: "Add your first customer" }).focus();
+    await page.keyboard.press("Enter");
+    const dialog = page.getByRole("dialog", { name: "Add customer" });
+    await dialog.getByLabel("First name").fill("Katherine");
+    await page.keyboard.press("Enter");
+
+    await expect(page.getByText("Customer added")).toBeVisible();
+    await expect(page.getByRole("row", { name: /Katherine/ })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Customers" })).toBeFocused();
+  });
+
   test("adds a customer: validates, maps server errors, defaults consent to off", async ({ page }) => {
     const api = await mockApi(page, { businesses: [bakery], customers: { b1: [ada] } });
     await page.goto("/businesses/b1/customers");

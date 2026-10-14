@@ -15,7 +15,30 @@ export type DeliverySegment = {
   label: string;
   count: number;
   percent: number;
+  /** Display text for the share; never "0%" for a non-zero count nor "100%" for a partial one. */
+  share: string;
 };
+
+/**
+ * A percentage that cannot contradict the counts: "0%" and "100%" only when exact, and
+ * "<1%" / ">99%" for the tiny and near-total shares that plain rounding would flatten.
+ */
+export function shareLabel(count: number, total: number): string {
+  if (total <= 0 || count <= 0) {
+    return "0%";
+  }
+  if (count >= total) {
+    return "100%";
+  }
+  const percent = (count / total) * 100;
+  if (percent < 0.5) {
+    return "<1%";
+  }
+  if (percent >= 99.5) {
+    return ">99%";
+  }
+  return `${Math.round(percent)}%`;
+}
 
 /** All three states (zeros included, for the legend), or nothing when no message exists. */
 export function deliverySegments(
@@ -26,17 +49,35 @@ export function deliverySegments(
     return [];
   }
 
-  const share = (count: number) => Math.round((count / total) * 1000) / 10;
+  const percent = (count: number) => Math.round((count / total) * 1000) / 10;
+  const segment = (key: DeliverySegment["key"], label: string, count: number): DeliverySegment => ({
+    key,
+    label,
+    count,
+    percent: percent(count),
+    share: shareLabel(count, total),
+  });
 
   return [
-    { key: "sent", label: "Sent", count: messages.sent, percent: share(messages.sent) },
-    { key: "failed", label: "Failed", count: messages.failed, percent: share(messages.failed) },
-    { key: "pending", label: "Pending", count: messages.pending, percent: share(messages.pending) },
+    segment("sent", "Sent", messages.sent),
+    segment("failed", "Failed", messages.failed),
+    segment("pending", "Pending", messages.pending),
   ];
 }
 
-export function successRateLabel(rate: number | null): string | null {
-  return rate === null ? null : `${Math.round(rate)}% success rate`;
+/**
+ * Sent ÷ (sent + failed), computed here from the same counts the legend shows so the two can
+ * never disagree. Pending messages have no outcome yet, so they are noted rather than counted.
+ */
+export function successRateLabel(
+  messages: Pick<DashboardSummary["messages"], "sent" | "failed" | "pending">,
+): string | null {
+  const finished = messages.sent + messages.failed;
+  if (finished <= 0) {
+    return null;
+  }
+  const base = `${shareLabel(messages.sent, finished)} success rate`;
+  return messages.pending > 0 ? `${base} (pending messages not counted)` : base;
 }
 
 export type SetupStep = {

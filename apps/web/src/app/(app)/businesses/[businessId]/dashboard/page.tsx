@@ -18,6 +18,7 @@ import { ErrorState } from "@/components/ui/state";
 import { setupSteps, showSetupChecklist } from "@/lib/dashboard";
 import type { DashboardResponse } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
+import { useFocusRescue } from "@/lib/useFocusRescue";
 
 export default function DashboardPage() {
   const { businessId } = useParams<{ businessId: string }>();
@@ -27,11 +28,13 @@ export default function DashboardPage() {
 
 function DashboardView({ businessId }: { businessId: string }) {
   const { businesses } = useBusinesses();
-  const businessName = businesses.find((business) => business.id === businessId)?.name ?? "Business";
   const { data, error, slow, refetch } = useApi<DashboardResponse>(
     `/api/businesses/${businessId}/dashboard`,
   );
   const [addingCustomer, setAddingCustomer] = useState(false);
+  const arm = useFocusRescue(data);
+  const businessName =
+    data?.business.name ?? businesses.find((business) => business.id === businessId)?.name ?? "Business";
 
   const steps = data ? setupSteps(data.summary) : [];
 
@@ -40,7 +43,7 @@ function DashboardView({ businessId }: { businessId: string }) {
       <PageHeader
         breadcrumbs={[
           { label: "Businesses", href: "/businesses" },
-          { label: businessName },
+          { label: businessName, href: `/businesses/${businessId}/dashboard` },
           { label: "Dashboard" },
         ]}
         title="Dashboard"
@@ -92,7 +95,7 @@ function DashboardView({ businessId }: { businessId: string }) {
           <p className="mt-6 text-sm text-muted">
             Need to change the name or contact details?{" "}
             <Link href="/businesses" className="font-medium text-accent hover:underline">
-              Edit this business
+              Edit it on the Businesses page
             </Link>
             .
           </p>
@@ -103,7 +106,10 @@ function DashboardView({ businessId }: { businessId: string }) {
         open={addingCustomer}
         onClose={() => setAddingCustomer(false)}
         businessId={businessId}
-        onSaved={refetch}
+        onSaved={() => {
+          arm();
+          refetch();
+        }}
       />
     </PageContainer>
   );

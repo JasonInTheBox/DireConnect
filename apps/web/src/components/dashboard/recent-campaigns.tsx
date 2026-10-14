@@ -27,6 +27,7 @@ export function RecentCampaigns({
             >
               <Link
                 href={campaignHref(businessId, campaign)}
+                title={campaign.title}
                 className="inline-flex min-h-10 min-w-0 flex-[1_1_10rem] items-center text-sm font-medium text-ink hover:underline"
               >
                 <span className="truncate">{campaign.title}</span>

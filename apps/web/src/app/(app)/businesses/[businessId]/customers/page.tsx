@@ -24,6 +24,7 @@ import {
 } from "@/lib/customers";
 import type { Customer } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
+import { useFocusRescue } from "@/lib/useFocusRescue";
 
 export default function CustomersPage() {
   const { businessId } = useParams<{ businessId: string }>();
@@ -58,6 +59,7 @@ function CustomersView({ businessId }: { businessId: string }) {
   const { data, error, slow, refetch } = useApi<Customer[]>(
     `/api/businesses/${businessId}/customers`,
   );
+  const arm = useFocusRescue(data);
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ConsentFilter>("all");
@@ -166,14 +168,20 @@ function CustomersView({ businessId }: { businessId: string }) {
         open={creating}
         onClose={() => setCreating(false)}
         businessId={businessId}
-        onSaved={refetch}
+        onSaved={() => {
+          arm();
+          refetch();
+        }}
       />
       <CustomerFormDialog
         open={editing !== null}
         customer={editing}
         onClose={() => setEditing(null)}
         businessId={businessId}
-        onSaved={refetch}
+        onSaved={() => {
+          arm();
+          refetch();
+        }}
       />
       <ConfirmDialog
         open={deleting !== null}
