@@ -39,7 +39,7 @@ export function SetupChecklist({
               <Icon name="check" className="h-3.5 w-3.5" />
             </span>
 
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-[1_1_12rem]">
               <p className={cn("text-sm font-medium", step.done ? "text-muted" : "text-ink")}>
                 {step.title}
                 {step.done ? <span className="sr-only"> (done)</span> : null}
