@@ -97,9 +97,12 @@ export function StepReview({
             {block.action ? (
               <Link
                 href={block.action.href}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={buttonClasses({ variant: "secondary", className: "mt-2" })}
               >
                 {block.action.label}
+                <span className="sr-only"> (opens in a new tab)</span>
               </Link>
             ) : null}
           </div>

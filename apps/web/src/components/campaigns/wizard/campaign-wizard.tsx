@@ -70,6 +70,8 @@ export function CampaignWizard({
   const formRef = useRef<HTMLFormElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const shownStep = useRef(stepIndex);
+  // Set when a failed save wants focus on the first invalid field once its errors are on screen.
+  const focusInvalidAfterRender = useRef(false);
   const session = useSession();
   const [confirming, setConfirming] = useState(false);
   const [sending, setSending] = useState(false);
@@ -93,8 +95,24 @@ export function CampaignWizard({
       return;
     }
     shownStep.current = stepIndex;
+    if (focusInvalidAfterRender.current) {
+      // The invalid field takes focus instead (see the effect below).
+      return;
+    }
     headingRef.current?.focus();
   }, [stepIndex]);
+
+  // After the render that shows server field errors (and the step that owns them), focus the field.
+  useEffect(() => {
+    if (!focusInvalidAfterRender.current) {
+      return;
+    }
+    const invalid = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]');
+    if (invalid || Object.keys(errors).length === 0) {
+      focusInvalidAfterRender.current = false;
+      invalid?.focus();
+    }
+  }, [errors, stepIndex]);
 
   // A refused send leaves a panel on the Review step; move focus there once it appears.
   useEffect(() => {
@@ -145,7 +163,7 @@ export function CampaignWizard({
       if (index >= 0) {
         setStepIndex(index);
       }
-      focusFirstInvalid(formRef.current);
+      focusInvalidAfterRender.current = true;
     }
     if (unmapped.length > 0) {
       setFormError(unmapped.join(" "));

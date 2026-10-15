@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useCampaign } from "@/components/campaigns/detail/campaign-context";
 import { CampaignStatusBadge } from "@/components/campaigns/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonClasses } from "@/components/ui/button";
@@ -27,6 +28,7 @@ export function CampaignHeader({
 }) {
   const router = useRouter();
   const toast = useToast();
+  const { refetch } = useCampaign();
   const [deleting, setDeleting] = useState(false);
   const actions = headerActionsFor(campaign);
   const listHref = `/businesses/${businessId}/campaigns`;
@@ -94,9 +96,15 @@ export function CampaignHeader({
         description="This removes the draft. This can’t be undone."
         confirmLabel="Delete campaign"
         onConfirm={async () => {
-          await apiFetch(`/api/businesses/${businessId}/campaigns/${campaign.id}`, {
-            method: "DELETE",
-          });
+          try {
+            await apiFetch(`/api/businesses/${businessId}/campaigns/${campaign.id}`, {
+              method: "DELETE",
+            });
+          } catch (error) {
+            // The campaign may have been queued elsewhere; stop offering draft actions if so.
+            refetch();
+            throw error;
+          }
           toast.success("Campaign deleted");
           router.push(listHref);
         }}

@@ -28,9 +28,9 @@ export function Panel({
 /** One label/value line inside a `<dl>`. Values use tabular figures so they align in a column. */
 export function PanelRow({ label, value }: { label: ReactNode; value: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <dt className="text-muted">{label}</dt>
-      <dd className="font-medium tabular-nums text-ink">{value}</dd>
+    <div className="flex items-start justify-between gap-3">
+      <dt className="min-w-0 break-words text-muted [overflow-wrap:anywhere]">{label}</dt>
+      <dd className="shrink-0 font-medium tabular-nums text-ink">{value}</dd>
     </div>
   );
 }

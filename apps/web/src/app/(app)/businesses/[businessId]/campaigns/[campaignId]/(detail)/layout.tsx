@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { CampaignProvider } from "@/components/campaigns/detail/campaign-context";
 import { CampaignHeader } from "@/components/campaigns/detail/campaign-header";
 import { useBusinesses } from "@/components/shell/businesses-provider";
-import { buttonClasses } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { PageContainer } from "@/components/ui/page-header";
 import { ListSkeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/state";
@@ -37,7 +37,7 @@ function CampaignDetailShell({
   const { businesses } = useBusinesses();
   const businessName = businesses.find((business) => business.id === businessId)?.name ?? "Business";
   // The API has no single-campaign endpoint, so read the list and find the campaign.
-  const { data, error, slow, refetch } = useApi<Campaign[]>(`/api/businesses/${businessId}/campaigns`);
+  const { data, error, loading, slow, refetch } = useApi<Campaign[]>(`/api/businesses/${businessId}/campaigns`);
   const campaign = data?.find((item) => item.id === campaignId) ?? null;
 
   if (data === null && error === null) {
@@ -74,9 +74,25 @@ function CampaignDetailShell({
   }
 
   return (
-    <CampaignProvider campaign={campaign} refetch={refetch}>
+    <CampaignProvider
+      campaign={campaign}
+      refetch={refetch}
+      refreshing={loading}
+      refreshError={error !== null}
+    >
       <PageContainer>
         <CampaignHeader businessId={businessId} businessName={businessName} campaign={campaign} />
+        {error ? (
+          <div
+            role="alert"
+            className="-mt-3 mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-control border border-warning bg-warning-soft px-3 py-2 text-sm"
+          >
+            <p className="min-w-0 text-ink">
+              Couldn’t refresh the campaign. Showing the earlier details.
+            </p>
+            <Button onClick={refetch}>Try again</Button>
+          </div>
+        ) : null}
         <LinkTabs
           label="Campaign sections"
           items={DETAIL_TABS.map((tab) => ({

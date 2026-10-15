@@ -576,7 +576,10 @@ test.describe("campaign wizard: unconfirmed email", () => {
 
     await expect(page.getByText("Confirm your email address first")).toBeVisible();
     await expect(page.getByText("Open your Account page to resend the confirmation email")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Open Account" })).toHaveAttribute("href", "/account");
+    const accountLink = page.getByRole("link", { name: "Open Account (opens in a new tab)" });
+    await expect(accountLink).toHaveAttribute("href", "/account");
+    await expect(accountLink).toHaveAttribute("target", "_blank");
+    await expect(accountLink).toHaveAttribute("rel", /noopener/);
     await expect(page.getByRole("button", { name: "Send now" })).toBeDisabled();
   });
 });

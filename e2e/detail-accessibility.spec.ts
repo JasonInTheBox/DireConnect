@@ -2,7 +2,10 @@ import { expect, test } from "@playwright/test";
 import { business, campaign, customer, log, mockApi, signIn } from "./helpers/app";
 
 const bakery = business("b1", "Corner Bakery");
-const LONG = "A-campaign-name-without-any-spaces-that-is-much-longer-than-a-phone-screen-is-wide";
+// Unbroken strings (no spaces, hyphens or slashes): browsers have no break opportunity inside them.
+const LONG = "A".repeat(90);
+const LONG_EMAIL = `${"a".repeat(70)}@${"b".repeat(30)}.example.com`;
+const LONG_REASON = `Daily limit reached for this account and ${"z".repeat(80)}`;
 
 const sent = campaign("k-4", LONG, {
   status: "SENT",
@@ -10,12 +13,14 @@ const sent = campaign("k-4", LONG, {
   message: `${LONG}${LONG}`,
 });
 
+const longDraft = campaign("k-1", LONG, { message: `${LONG}${LONG}` });
+
 const mocks = {
   businesses: [bakery],
   customers: {
-    b1: [customer("c-1", "Ada", { email: "ada-with-a-very-long-address-that-keeps-going@example.com", emailOptIn: true })],
+    b1: [customer("c-1", "Ada", { email: LONG_EMAIL, emailOptIn: true })],
   },
-  campaigns: { b1: [sent] },
+  campaigns: { b1: [sent, longDraft] },
   analytics: {
     "k-4": {
       eligibleCount: 4,
@@ -23,15 +28,15 @@ const mocks = {
       failedDeliveryCount: 2,
       skippedBeforeSendCount: 1,
       skippedByReason: { "Customer has unsubscribed": 1 },
-      failedByReason: { "Daily limit reached for this account and this is an unbroken-reason-string-that-is-very-long": 2 },
+      failedByReason: { [LONG_REASON]: 2 },
     },
   },
   logs: {
     "k-4": [
-      log("l-1", "k-4", "ada-with-a-very-long-address-that-keeps-going@example.com", {
+      log("l-1", "k-4", LONG_EMAIL, {
         status: "FAILED",
         sentAt: null,
-        errorMessage: "Daily limit reached for this account and this is an unbroken-reason-string-that-is-very-long",
+        errorMessage: LONG_REASON,
       }),
     ],
   },
@@ -72,19 +77,30 @@ test.describe("campaign detail and account: keyboard and small screens", () => {
     await expect(remove).toBeFocused();
   });
 
-  for (const tab of ["preview", "analytics", "logs"]) {
-    test(`the ${tab} tab does not scroll sideways at 375px`, async ({ page }) => {
+  // A sent campaign, and an email draft (which also shows Review and send, Edit and Delete).
+  const cases = [
+    { id: "k-4", tab: "preview", marker: "Customers checked" },
+    { id: "k-4", tab: "analytics", marker: "Eligible when queued" },
+    { id: "k-4", tab: "logs", marker: "Why a message can fail" },
+    { id: "k-1", tab: "preview", marker: "Customers checked" },
+    { id: "k-1", tab: "analytics", marker: "No results yet" },
+    { id: "k-1", tab: "logs", marker: "Why a message can fail" },
+  ];
+  for (const { id, tab, marker } of cases) {
+    test(`the ${tab} tab of ${id === "k-1" ? "a draft" : "a sent campaign"} does not scroll sideways at 375px`, async ({
+      page,
+    }) => {
       await mockApi(page, mocks);
       await page.setViewportSize({ width: 375, height: 812 });
-      await page.goto(`/businesses/b1/campaigns/k-4/${tab}`);
+      await page.goto(`/businesses/b1/campaigns/${id}/${tab}`);
 
       // Wait for real content, not just the header.
-      const marker = {
-        preview: "Customers checked",
-        analytics: "Eligible when queued",
-        logs: "Why a message can fail",
-      }[tab]!;
       await expect(page.getByText(marker).first()).toBeVisible();
+      if (id === "k-1") {
+        await expect(page.getByRole("link", { name: "Review and send" }).first()).toBeVisible();
+        await expect(page.getByRole("link", { name: "Edit" })).toBeVisible();
+        await expect(page.getByRole("button", { name: "Delete" })).toBeVisible();
+      }
 
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

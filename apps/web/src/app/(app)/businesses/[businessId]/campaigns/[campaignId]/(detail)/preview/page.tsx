@@ -35,7 +35,7 @@ export default function CampaignAudiencePage() {
     <div className="space-y-4">
       <p className="max-w-prose text-sm text-muted">{audienceIntro(campaign, summary)}</p>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Panel id="audience-summary-heading" title="Summary">
           <dl className="mt-3 space-y-2 text-sm">
             <PanelRow label="Customers checked" value={summary.totalCustomers} />
@@ -57,7 +57,7 @@ export default function CampaignAudiencePage() {
         </Panel>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <RecipientList
           title="Recipients"
           emptyText="No customers can receive this campaign."

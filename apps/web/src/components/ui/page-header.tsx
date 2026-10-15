@@ -47,11 +47,11 @@ export function PageHeader({
           <h1
             id="page-title"
             tabIndex={-1}
-            className="text-xl font-semibold tracking-tight text-ink focus:outline-none"
+            className="break-words text-xl font-semibold tracking-tight text-ink [overflow-wrap:anywhere] focus:outline-none"
           >{title}</h1>
           {description ? <p className="mt-1 max-w-prose text-sm text-muted">{description}</p> : null}
         </div>
-        {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+        {actions ? <div className="flex max-w-full flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
     </header>
   );

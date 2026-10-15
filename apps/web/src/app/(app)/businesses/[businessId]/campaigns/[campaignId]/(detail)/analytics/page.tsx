@@ -22,10 +22,10 @@ import { useApi } from "@/lib/useApi";
 
 export default function CampaignResultsPage() {
   const { businessId, campaignId } = useParams<{ businessId: string; campaignId: string }>();
-  const { campaign, refetch: refetchCampaign } = useCampaign();
+  const { campaign, refetch: refetchCampaign, refreshing: campaignRefreshing } = useCampaign();
   const isDraft = campaign.status === "DRAFT";
   // A draft has nothing to report, so do not ask.
-  const { data, error, slow, refetch } = useApi<CampaignAnalyticsResponse>(
+  const { data, error, loading, slow, refetch } = useApi<CampaignAnalyticsResponse>(
     isDraft ? null : `/api/businesses/${businessId}/campaigns/${campaignId}/analytics`,
   );
 
@@ -63,6 +63,16 @@ export default function CampaignResultsPage() {
   const { summary } = data;
   const skipped = skippedReasons(summary.skippedByReason);
   const failures = failureReasons(summary.failedByReason);
+  const refreshing = loading || campaignRefreshing;
+
+  function refresh() {
+    // Not disabled (that would drop keyboard focus), so ignore clicks while a reload is running.
+    if (refreshing) {
+      return;
+    }
+    refetch();
+    refetchCampaign();
+  }
 
   return (
     <div className="space-y-4">
@@ -77,16 +87,26 @@ export default function CampaignResultsPage() {
             <p className="text-sm text-ink">{LEGACY_ANALYTICS_NOTE}</p>
           ) : null}
         </div>
-        <Button
-          onClick={() => {
-            refetch();
-            refetchCampaign();
-          }}
-        >
-          <Icon name="clock" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-3">
+          <span role="status" aria-live="polite" className="text-sm text-muted">
+            {refreshing ? "Refreshing…" : ""}
+          </span>
+          <Button onClick={refresh} aria-disabled={refreshing || undefined}>
+            <Icon name="clock" />
+            Refresh
+          </Button>
+        </div>
       </div>
+
+      {error ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-control border border-warning bg-warning-soft px-3 py-2 text-sm"
+        >
+          <p className="min-w-0 text-ink">Couldn’t refresh. Showing the earlier numbers.</p>
+          <Button onClick={refresh}>Try again</Button>
+        </div>
+      ) : null}
 
       <DeliveryPanel
         messages={{
@@ -99,7 +119,7 @@ export default function CampaignResultsPage() {
         emptyText="No messages have gone out yet. They appear here as the campaign is delivered."
       />
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Panel id="results-recipients-heading" title="Recipients">
           <dl className="mt-3 space-y-2 text-sm">
             <PanelRow label="Customers checked" value={summary.totalRecipientCount} />

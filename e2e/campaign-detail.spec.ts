@@ -118,6 +118,25 @@ test.describe("campaign detail", () => {
     ).toBe(true);
   });
 
+  test("a failed delete shows the server message and stops offering draft actions if the campaign was queued", async ({
+    page,
+  }) => {
+    const state = await mockApi(page, { businesses: [bakery], campaigns: { b1: [draft] } });
+    await page.goto("/businesses/b1/campaigns/k-1/preview");
+    await expect(page.getByRole("button", { name: "Delete" })).toBeVisible();
+
+    // The campaign is queued from somewhere else while this page is open.
+    state.campaigns.b1[0].status = "QUEUED";
+    await page.getByRole("button", { name: "Delete" }).click();
+    const dialog = page.getByRole("dialog", { name: "Delete “Spring menu”?" });
+    await dialog.getByRole("button", { name: "Delete campaign" }).click();
+
+    await expect(dialog).toContainText("Campaign not found. Queued or sent campaigns cannot be deleted.");
+    await expect(page.getByRole("link", { name: "Review and send" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Edit" })).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Campaign summary" })).toContainText("Queued");
+  });
+
   test("sent, queued and failed campaigns offer no actions, and an SMS draft offers only Delete", async ({
     page,
   }) => {
@@ -273,21 +292,129 @@ test.describe("campaign detail: Audience and Results", () => {
   test("Results for a queued campaign explains the wait, and Refresh reloads both the numbers and the status", async ({
     page,
   }) => {
-    const state = await mockApi(page, {
-      businesses: [bakery],
-      campaigns: { b1: [queued] },
-      analytics: { "k-3": { eligibleCount: 3, pendingCount: 3 } },
-    });
+    const analytics: Record<string, { eligibleCount: number; pendingCount?: number; sentCount?: number }> = {
+      "k-3": { eligibleCount: 3, pendingCount: 3 },
+    };
+    const state = await mockApi(page, { businesses: [bakery], campaigns: { b1: [queued] }, analytics });
+    const analyticsGets = () =>
+      state.requests.filter((request) => request.method === "GET" && request.path.endsWith("/k-3/analytics"))
+        .length;
     await page.goto("/businesses/b1/campaigns/k-3/analytics");
 
     await expect(page.getByText(/queued and waiting to be sent/)).toBeVisible();
     await expect(page.getByRole("region", { name: "Campaign summary" })).toContainText("Queued");
+    await expect(page.getByRole("region", { name: "Delivery", exact: true })).toContainText("Pending3");
+    expect(analyticsGets()).toBe(1);
 
     // The worker finishes while the page is open.
     state.campaigns.b1[0].status = "SENT";
+    analytics["k-3"] = { eligibleCount: 3, sentCount: 3 };
     await page.getByRole("button", { name: "Refresh" }).click();
     await expect(page.getByRole("region", { name: "Campaign summary" })).toContainText("Sent");
     await expect(page.getByText(/queued and waiting to be sent/)).toHaveCount(0);
+    await expect.poll(analyticsGets).toBe(2);
+    await expect(page.getByRole("region", { name: "Delivery", exact: true })).not.toContainText("Pending3");
+  });
+
+  test("Refresh says it is refreshing, keeps focus on its button and ignores clicks while busy", async ({
+    page,
+  }) => {
+    const state = await mockApi(page, { businesses: [bakery], campaigns: { b1: [queued] } });
+    let gets = 0;
+    await page.route("**/api/businesses/b1/campaigns/k-3/analytics", async (route) => {
+      gets += 1;
+      if (gets === 2) {
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+      }
+      await route.fallback();
+    });
+    await page.goto("/businesses/b1/campaigns/k-3/analytics");
+    await expect(page.getByText(/queued and waiting to be sent/)).toBeVisible();
+
+    const refresh = page.getByRole("button", { name: "Refresh" });
+    await refresh.click();
+    await expect(page.getByText("Refreshing…")).toBeVisible();
+    // Not disabled (that would drop focus); it is marked busy and further clicks are ignored.
+    await expect(refresh).not.toHaveAttribute("disabled");
+    await expect(refresh).toHaveAttribute("aria-disabled", "true");
+    await expect(refresh).toBeFocused();
+    await refresh.click({ force: true });
+    await expect(page.getByText("Refreshing…")).toHaveCount(0);
+    expect(
+      state.requests.filter((request) => request.method === "GET" && request.path.endsWith("/k-3/analytics"))
+        .length,
+    ).toBe(2);
+  });
+
+  test("a failed Refresh keeps the earlier numbers, says so, and Try again recovers", async ({ page }) => {
+    await mockApi(page, {
+      businesses: [bakery],
+      campaigns: { b1: [queued] },
+      analytics: { "k-3": { eligibleCount: 3, pendingCount: 3 } },
+    });
+    let gets = 0;
+    await page.route("**/api/businesses/b1/campaigns/k-3/analytics", async (route) => {
+      gets += 1;
+      if (gets === 2) {
+        await route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          headers: { "access-control-allow-origin": "*" },
+          body: JSON.stringify({ error: "Analytics unavailable" }),
+        });
+        return;
+      }
+      await route.fallback();
+    });
+    await page.goto("/businesses/b1/campaigns/k-3/analytics");
+    const delivery = page.getByRole("region", { name: "Delivery", exact: true });
+    await expect(delivery).toContainText("Pending3");
+
+    await page.getByRole("button", { name: "Refresh" }).click();
+    const notice = page.getByRole("alert").filter({ hasText: "Couldn’t refresh. Showing the earlier numbers." });
+    await expect(notice).toBeVisible();
+    await expect(delivery).toContainText("Pending3");
+
+    await notice.getByRole("button", { name: "Try again" }).click();
+    await expect(notice).toHaveCount(0);
+    await expect(delivery).toContainText("Pending3");
+    expect(gets).toBe(3);
+  });
+
+  test("a failed campaign reload shows a notice under the header and the page stays usable", async ({
+    page,
+  }) => {
+    await mockApi(page, {
+      businesses: [bakery],
+      campaigns: { b1: [queued] },
+      analytics: { "k-3": { eligibleCount: 3, pendingCount: 3 } },
+    });
+    let lists = 0;
+    await page.route("**/api/businesses/b1/campaigns", async (route) => {
+      lists += 1;
+      if (lists === 2) {
+        await route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          headers: { "access-control-allow-origin": "*" },
+          body: JSON.stringify({ error: "List unavailable" }),
+        });
+        return;
+      }
+      await route.fallback();
+    });
+    await page.goto("/businesses/b1/campaigns/k-3/analytics");
+    await expect(page.getByText(/queued and waiting to be sent/)).toBeVisible();
+
+    await page.getByRole("button", { name: "Refresh" }).click();
+    const notice = page
+      .getByRole("alert")
+      .filter({ hasText: "Couldn’t refresh the campaign. Showing the earlier details." });
+    await expect(notice).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Weekend offer" })).toBeVisible();
+
+    await notice.getByRole("button", { name: "Try again" }).click();
+    await expect(notice).toHaveCount(0);
   });
 
   test("Results explains an older campaign without a saved recipient list, and an empty delivery", async ({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useLogout } from "@/components/shell/use-logout";
 import { useSession } from "@/components/shell/session-provider";
 import { Badge } from "@/components/ui/badge";
@@ -133,6 +133,19 @@ function PasswordPanel() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // A server refusal arrives after an await, so focus the field from an effect once its error is shown.
+  const focusAfterRender = useRef(false);
+
+  useEffect(() => {
+    if (!focusAfterRender.current) {
+      return;
+    }
+    const invalid = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]');
+    if (invalid) {
+      focusAfterRender.current = false;
+      invalid.focus();
+    }
+  }, [errors]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -155,8 +168,8 @@ function PasswordPanel() {
       if (error) {
         const text = authErrorMessage(error, "Could not change the password. Try again.");
         if (passwordErrorTarget(text) === "password") {
+          focusAfterRender.current = true;
           setErrors({ password: text });
-          focusFirstInvalid(formRef.current);
         } else {
           setFormError(text);
         }
