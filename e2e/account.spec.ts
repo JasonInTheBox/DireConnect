@@ -34,6 +34,8 @@ test.describe("account page", () => {
     await page.getByRole("button", { name: "Change password" }).click();
     await expect(page.getByText("The passwords don’t match.")).toBeVisible();
 
+    // Let the page settle so an asynchronous send could not slip past the check below.
+    await page.waitForTimeout(500);
     expect(state.authRequests.some((request) => request.path === "/auth/v1/user")).toBe(false);
   });
 
@@ -105,10 +107,11 @@ test.describe("account page", () => {
 
   test("logs out from the page", async ({ page }) => {
     await signIn(page);
-    await mockApi(page, { businesses: [bakery] });
+    const state = await mockApi(page, { businesses: [bakery] });
     await page.goto("/account");
 
     await page.getByRole("region", { name: "Session" }).getByRole("button", { name: "Log out" }).click();
     await expect(page).toHaveURL(/\/login$/);
+    expect(state.authRequests.some((request) => request.path === "/auth/v1/logout")).toBe(true);
   });
 });

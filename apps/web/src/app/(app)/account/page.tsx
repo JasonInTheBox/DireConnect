@@ -46,13 +46,16 @@ function SignInPanel() {
     }
     setResending(true);
     setMessage(null);
-    const { error } = await supabase.auth.resend({ type: "signup", email: user.email });
-    setResending(false);
-    if (error) {
-      setMessage(authErrorMessage(error, "Could not send the confirmation email. Try again."));
-      return;
+    try {
+      const { error } = await supabase.auth.resend({ type: "signup", email: user.email });
+      if (error) {
+        setMessage(authErrorMessage(error, "Could not send the confirmation email. Try again."));
+        return;
+      }
+      toast.success("Confirmation email sent");
+    } finally {
+      setResending(false);
     }
-    toast.success("Confirmation email sent");
   }
 
   async function recheck() {
@@ -61,17 +64,20 @@ function SignInPanel() {
     }
     setChecking(true);
     setMessage(null);
-    // A fresh session carries the current confirmation state; SessionProvider picks it up.
-    const { data, error } = await supabase.auth.refreshSession();
-    setChecking(false);
-    if (error || !data.session) {
-      setMessage(authErrorMessage(error, "Could not check your email status. Try again."));
-      return;
-    }
-    if (toSessionUser(data.session.user).emailConfirmed) {
-      toast.success("Email confirmed");
-    } else {
-      setMessage("Your email isn’t confirmed yet. Open the link in the confirmation email first.");
+    try {
+      // A fresh session carries the current confirmation state; SessionProvider picks it up.
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error || !data.session) {
+        setMessage(authErrorMessage(error, "Could not check your email status. Try again."));
+        return;
+      }
+      if (toSessionUser(data.session.user).emailConfirmed) {
+        toast.success("Email confirmed");
+      } else {
+        setMessage("Your email isn’t confirmed yet. Open the link in the confirmation email first.");
+      }
+    } finally {
+      setChecking(false);
     }
   }
 
@@ -144,22 +150,24 @@ function PasswordPanel() {
     setErrors({});
 
     setSaving(true);
-    const { error } = await supabase.auth.updateUser({ password: values.password });
-    setSaving(false);
-
-    if (error) {
-      const text = authErrorMessage(error, "Could not change the password. Try again.");
-      if (passwordErrorTarget(text) === "password") {
-        setErrors({ password: text });
-        focusFirstInvalid(formRef.current);
-      } else {
-        setFormError(text);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: values.password });
+      if (error) {
+        const text = authErrorMessage(error, "Could not change the password. Try again.");
+        if (passwordErrorTarget(text) === "password") {
+          setErrors({ password: text });
+          focusFirstInvalid(formRef.current);
+        } else {
+          setFormError(text);
+        }
+        return;
       }
-      return;
-    }
 
-    setValues({ password: "", confirm: "" });
-    toast.success("Password changed");
+      setValues({ password: "", confirm: "" });
+      toast.success("Password changed");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -199,14 +207,18 @@ function SessionPanel() {
   return (
     <Panel id="account-session-heading" title="Session">
       <p className="mt-2 max-w-prose text-sm text-muted">
-        Log out of DireConnect on this device.
+        Log out of DireConnect.
       </p>
       <Button
         className="mt-4"
         loading={busy}
         onClick={async () => {
           setBusy(true);
-          await logout();
+          try {
+            await logout();
+          } finally {
+            setBusy(false);
+          }
         }}
       >
         <Icon name="logout" />

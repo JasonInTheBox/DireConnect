@@ -341,7 +341,7 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
     const url = new URL(request.url());
     const cors = {
       "access-control-allow-origin": "*",
-      "access-control-allow-headers": "*",
+      "access-control-allow-headers": "authorization,content-type,apikey,x-client-info",
       "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
     };
     const json = (status: number, body: unknown) =>
