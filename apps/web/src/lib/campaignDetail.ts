@@ -26,7 +26,7 @@ export function defaultDetailSegment(status: Campaign["status"]): "preview" | "a
   return status === "DRAFT" ? "preview" : "analytics";
 }
 
-/** Draft-only actions; an SMS draft (SMS is paused) can only be deleted. */
+/** Draft-only actions; an SMS draft (SMS is paused) can only be deleted. Send shares the edit permission (email drafts only). */
 export function headerActionsFor(campaign: Pick<Campaign, "status" | "channel">): {
   edit: boolean;
   send: boolean;

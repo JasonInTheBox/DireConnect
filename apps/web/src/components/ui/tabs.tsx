@@ -29,7 +29,7 @@ export function LinkTabs({
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative inline-flex h-10 items-center whitespace-nowrap px-3 text-sm font-medium transition-colors",
+                  "relative inline-flex h-10 items-center whitespace-nowrap px-3 text-sm font-medium transition-colors focus-visible:outline-offset-[-2px]",
                   active
                     ? "text-accent after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-accent"
                     : "text-muted hover:text-ink",
