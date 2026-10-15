@@ -82,6 +82,8 @@ export type SendBlock = {
   code: "no-recipients" | "over-limit" | "email-unconfirmed";
   title: string;
   message: string;
+  /** A place to go to fix the problem, when there is one. */
+  action?: { label: string; href: string };
 };
 
 /** Reasons the Send button must stay disabled, each explained in plain language. */
@@ -117,7 +119,8 @@ export function sendBlocks({
       code: "email-unconfirmed",
       title: "Confirm your email address first",
       message:
-        "Campaigns can only be sent from accounts with a confirmed email address. Open the confirmation email we sent you, then come back to Campaigns and open this draft again.",
+        "Campaigns can only be sent from accounts with a confirmed email address. Open your Account page to resend the confirmation email or check the status, then come back to this draft.",
+      action: { label: "Open Account", href: "/account" },
     });
   }
 

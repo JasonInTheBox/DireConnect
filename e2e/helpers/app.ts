@@ -211,6 +211,10 @@ type ApiMockOptions = {
   failAnalyticsFor?: string[];
   /** Makes every queue request fail with this status and message. */
   queueError?: { status: number; error: string };
+  /** Makes Supabase auth calls fail: `updateUser` answers 422 with this message. */
+  authErrors?: { updateUser?: string };
+  /** When true, a refreshed session reports the email as confirmed. */
+  confirmedAfterRefresh?: boolean;
 };
 
 function dashboardFor(
@@ -328,12 +332,66 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
     customersGetFailed: false,
     deleteFailed: false,
     dashboardGetFailed: false,
+    authRequests: [] as RecordedRequest[],
   };
 
   // The Supabase client may try to reach its (fake) host; keep it quiet and offline.
-  await page.route("https://example.supabase.co/**", (route) =>
-    route.fulfill({ status: 404, contentType: "application/json", body: "{}" }),
-  );
+  await page.route("https://example.supabase.co/**", async (route: Route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const cors = {
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
+    };
+    const json = (status: number, body: unknown) =>
+      route.fulfill({ status, headers: cors, contentType: "application/json", body: JSON.stringify(body) });
+
+    if (request.method() === "OPTIONS") {
+      return route.fulfill({ status: 204, headers: cors });
+    }
+
+    const rawBody = request.postData();
+    state.authRequests.push({
+      method: request.method(),
+      path: url.pathname,
+      body: rawBody ? JSON.parse(rawBody) : undefined,
+    });
+
+    const user = (confirmed: boolean) => ({
+      id: "user-1",
+      aud: "authenticated",
+      email: "owner@example.com",
+      ...(confirmed ? { email_confirmed_at: "2026-01-01T00:00:00Z" } : {}),
+      app_metadata: {},
+      user_metadata: {},
+      created_at: "2026-01-01T00:00:00Z",
+    });
+
+    if (url.pathname === "/auth/v1/user" && request.method() === "PUT") {
+      if (options.authErrors?.updateUser) {
+        return json(422, { code: 422, error_code: "weak_password", msg: options.authErrors.updateUser });
+      }
+      return json(200, user(true));
+    }
+    if (url.pathname === "/auth/v1/resend" && request.method() === "POST") {
+      return json(200, {});
+    }
+    if (url.pathname === "/auth/v1/token" && request.method() === "POST") {
+      return json(200, {
+        access_token: "test-access-token",
+        refresh_token: "test-refresh-token",
+        token_type: "bearer",
+        expires_in: 86_400,
+        expires_at: Math.floor(Date.now() / 1000) + 86_400,
+        user: user(Boolean(options.confirmedAfterRefresh)),
+      });
+    }
+    if (url.pathname === "/auth/v1/logout") {
+      return route.fulfill({ status: 204, headers: cors });
+    }
+    return json(404, {});
+  });
 
   await page.route(`${API}/**`, async (route: Route) => {
     const request = route.request();

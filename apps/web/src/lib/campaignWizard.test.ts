@@ -177,6 +177,19 @@ describe("sendBlocks", () => {
     ]);
   });
 
+  it("links the unconfirmed-email block to the Account page and no other block", () => {
+    const blocks = sendBlocks({ eligibleCount: 0, emailConfirmed: false });
+    expect(blocks.find((b) => b.code === "email-unconfirmed")?.action).toEqual({
+      label: "Open Account",
+      href: "/account",
+    });
+    expect(blocks.find((b) => b.code === "no-recipients")?.action).toBeUndefined();
+    expect(
+      sendBlocks({ eligibleCount: 11, emailConfirmed: true }).find((b) => b.code === "over-limit")
+        ?.action,
+    ).toBeUndefined();
+  });
+
   it("reports every applicable block", () => {
     expect(sendBlocks({ eligibleCount: 0, emailConfirmed: false }).map((b) => b.code)).toEqual([
       "no-recipients",

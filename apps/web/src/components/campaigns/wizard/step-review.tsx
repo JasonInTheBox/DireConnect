@@ -1,6 +1,7 @@
+import Link from "next/link";
 import { type RefObject } from "react";
 import { RecipientSummary, type PreviewState } from "./recipient-summary";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { TextField } from "@/components/ui/field";
 import type { SendBlock, SendFailure, WizardValues } from "@/lib/campaignWizard";
 import { localTimeZoneLabel, toLocalInput } from "@/lib/schedule";
@@ -93,6 +94,14 @@ export function StepReview({
           >
             <p className="font-medium text-warning">{block.title}</p>
             <p className="mt-0.5 text-ink">{block.message}</p>
+            {block.action ? (
+              <Link
+                href={block.action.href}
+                className={buttonClasses({ variant: "secondary", className: "mt-2" })}
+              >
+                {block.action.label}
+              </Link>
+            ) : null}
           </div>
         ))}
         {canRecheck ? <Button onClick={onRecheck}>Check again</Button> : null}

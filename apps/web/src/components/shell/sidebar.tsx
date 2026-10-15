@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { getBusinessIdFromPath, isNavActive } from "@/lib/navigation";
-import { supabase } from "@/lib/supabase";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { useBusinesses } from "./businesses-provider";
 import { BusinessSwitcher } from "./business-switcher";
 import { useSession } from "./session-provider";
+import { useLogout } from "./use-logout";
 
 type NavEntry = { href: string; label: string; icon: IconName; exact?: boolean };
 
@@ -70,7 +70,6 @@ export function Sidebar({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const user = useSession();
   const { businesses } = useBusinesses();
 
@@ -85,13 +84,7 @@ export function Sidebar({
       ]
     : [];
 
-  async function handleLogout() {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      await supabase.auth.signOut({ scope: "local" });
-    }
-    router.replace("/login");
-  }
+  const handleLogout = useLogout();
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -119,6 +112,13 @@ export function Sidebar({
             onNavigate={onNavigate}
           />
         ) : null}
+        <NavGroup
+          heading="Account"
+          entries={[{ href: "/account", label: "Account", icon: "user", exact: true }]}
+          pathname={pathname}
+          collapsed={collapsed}
+          onNavigate={onNavigate}
+        />
       </nav>
 
       <div className={cn("space-y-1 border-t border-line p-3", collapsed && "px-2")}>

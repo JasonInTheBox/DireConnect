@@ -575,6 +575,8 @@ test.describe("campaign wizard: unconfirmed email", () => {
     await reachReview(page);
 
     await expect(page.getByText("Confirm your email address first")).toBeVisible();
+    await expect(page.getByText("Open your Account page to resend the confirmation email")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Open Account" })).toHaveAttribute("href", "/account");
     await expect(page.getByRole("button", { name: "Send now" })).toBeDisabled();
   });
 });
