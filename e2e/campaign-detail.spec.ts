@@ -13,6 +13,8 @@ const sent = campaign("k-4", "Loyalty thanks", {
   sendAt: "2026-09-20T12:00:00.000Z",
 });
 const legacySms = campaign("k-6", "Text blast", { channel: "SMS" });
+const queued = campaign("k-3", "Weekend offer", { status: "QUEUED" });
+const failedCampaign = campaign("k-5", "Autumn tasting", { status: "FAILED" });
 
 test.describe("campaign detail", () => {
   test.beforeEach(async ({ page }) => {
@@ -116,19 +118,199 @@ test.describe("campaign detail", () => {
     ).toBe(true);
   });
 
-  test("a sent campaign offers no actions, and an SMS draft offers only Delete", async ({ page }) => {
-    await mockApi(page, { businesses: [bakery], campaigns: { b1: [sent, legacySms] } });
+  test("sent, queued and failed campaigns offer no actions, and an SMS draft offers only Delete", async ({
+    page,
+  }) => {
+    await mockApi(page, {
+      businesses: [bakery],
+      campaigns: { b1: [sent, queued, failedCampaign, legacySms] },
+    });
 
-    await page.goto("/businesses/b1/campaigns/k-4/analytics");
-    await expect(page.getByRole("heading", { level: 1, name: "Loyalty thanks" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Review and send" })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Edit" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Delete" })).toHaveCount(0);
+    for (const [id, title] of [
+      ["k-4", "Loyalty thanks"],
+      ["k-3", "Weekend offer"],
+      ["k-5", "Autumn tasting"],
+    ]) {
+      await page.goto(`/businesses/b1/campaigns/${id}/analytics`);
+      await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Review and send" })).toHaveCount(0);
+      await expect(page.getByRole("link", { name: "Edit" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Delete" })).toHaveCount(0);
+    }
+
+    // The send route refuses a campaign that has already been queued.
+    await page.goto("/businesses/b1/campaigns/k-3/send");
+    await expect(page.getByRole("heading", { name: "This campaign can’t be edited" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Send now" })).toHaveCount(0);
 
     await page.goto("/businesses/b1/campaigns/k-6/preview");
     await expect(page.getByText("SMS sending is paused")).toBeVisible();
     await expect(page.getByRole("button", { name: "Delete" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Review and send" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Edit" })).toHaveCount(0);
+  });
+
+  test("landing on the send route never sends; Send now only opens the confirm dialog", async ({
+    page,
+  }) => {
+    const state = await mockApi(page, {
+      businesses: [bakery],
+      customers: { b1: people },
+      campaigns: { b1: [draft] },
+    });
+    await page.goto("/businesses/b1/campaigns/k-1/send");
+
+    const sendNow = page.getByRole("button", { name: "Send now" });
+    await expect(sendNow).toBeEnabled();
+    expect(state.requests.some((request) => request.path.endsWith("/queue"))).toBe(false);
+
+    await sendNow.click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    expect(state.requests.some((request) => request.path.endsWith("/queue"))).toBe(false);
+
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toHaveCount(0);
+    expect(state.requests.some((request) => request.path.endsWith("/queue"))).toBe(false);
+  });
+});
+
+test.describe("campaign detail: Audience and Results", () => {
+  test.beforeEach(async ({ page }) => {
+    await signIn(page);
+  });
+
+  test("the Audience tab lists who will receive a draft and who is skipped, in plain words", async ({
+    page,
+  }) => {
+    const mixed = [
+      ...people,
+      customer("c-3", "Alan", { email: "alan@bletchley.test", unsubscribedAt: "2026-09-01T00:00:00Z" }),
+      customer("c-4", "Dee", { emailOptIn: true }),
+    ];
+    const state = await mockApi(page, {
+      businesses: [bakery],
+      customers: { b1: mixed },
+      campaigns: { b1: [draft] },
+    });
+    await page.goto("/businesses/b1/campaigns/k-1/preview");
+
+    await expect(page.getByText("This is who would receive the campaign right now.")).toBeVisible();
+    const summary = page.getByRole("region", { name: "Summary", exact: true });
+    await expect(summary).toContainText("Customers checked4");
+    await expect(summary).toContainText("Will receive it2");
+    await expect(summary).toContainText("Skipped2");
+
+    const reasons = page.getByRole("region", { name: "Why customers were skipped" });
+    await expect(reasons).toContainText("Hasn’t agreed to receive emails1");
+    await expect(reasons).toContainText("No email address1");
+
+    const recipients = page.getByRole("region", { name: "Recipients", exact: true });
+    await expect(recipients).toContainText("ada@example.com");
+    await expect(recipients).toContainText("grace@navy.test");
+    await expect(page.getByRole("region", { name: "Skipped customers" })).toContainText(
+      "Hasn’t agreed to receive emails",
+    );
+
+    // Viewing a draft never queues it.
+    expect(state.requests.some((request) => request.path.endsWith("/queue"))).toBe(false);
+    await expect(page.getByRole("button", { name: /Queue/ })).toHaveCount(0);
+  });
+
+  test("the Audience tab explains a saved recipient list for a sent campaign", async ({ page }) => {
+    await mockApi(page, { businesses: [bakery], customers: { b1: people }, campaigns: { b1: [sent] } });
+    await page.goto("/businesses/b1/campaigns/k-4/preview");
+
+    await expect(page.getByText("fixed when the campaign was queued")).toBeVisible();
+  });
+
+  test("Results for a draft says there is nothing yet and offers Review and send", async ({ page }) => {
+    const state = await mockApi(page, { businesses: [bakery], campaigns: { b1: [draft] } });
+    await page.goto("/businesses/b1/campaigns/k-1/analytics");
+
+    await expect(page.getByRole("heading", { name: "No results yet" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Review and send" }).last()).toHaveAttribute(
+      "href",
+      "/businesses/b1/campaigns/k-1/send",
+    );
+    expect(state.requests.some((request) => request.path.endsWith("/analytics"))).toBe(false);
+  });
+
+  test("Results shows delivery, recipients and the reasons for skips and failures", async ({ page }) => {
+    await mockApi(page, {
+      businesses: [bakery],
+      campaigns: { b1: [sent] },
+      analytics: {
+        "k-4": {
+          eligibleCount: 4,
+          sentCount: 2,
+          failedDeliveryCount: 2,
+          skippedBeforeSendCount: 1,
+          skippedByReason: { "Customer has unsubscribed": 1 },
+          failedByReason: { "Daily limit reached for this account": 2 },
+        },
+      },
+    });
+    await page.goto("/businesses/b1/campaigns/k-4/analytics");
+
+    const delivery = page.getByRole("region", { name: "Delivery", exact: true });
+    await expect(delivery).toContainText("Sent");
+    await expect(delivery).toContainText("50% success rate");
+
+    const recipients = page.getByRole("region", { name: "Recipients", exact: true });
+    await expect(recipients).toContainText("Eligible when queued4");
+    await expect(recipients).toContainText("Skipped before sending1");
+
+    await expect(page.getByRole("region", { name: "Why customers were skipped" })).toContainText(
+      "Hasn’t agreed to receive emails1",
+    );
+    await expect(page.getByRole("region", { name: "Why messages failed" })).toContainText(
+      "Daily limit reached for this account2",
+    );
+    await expect(page.getByText(/Daily sending limits can mark some recipients as failed/)).toBeVisible();
+  });
+
+  test("Results for a queued campaign explains the wait, and Refresh reloads both the numbers and the status", async ({
+    page,
+  }) => {
+    const state = await mockApi(page, {
+      businesses: [bakery],
+      campaigns: { b1: [queued] },
+      analytics: { "k-3": { eligibleCount: 3, pendingCount: 3 } },
+    });
+    await page.goto("/businesses/b1/campaigns/k-3/analytics");
+
+    await expect(page.getByText(/queued and waiting to be sent/)).toBeVisible();
+    await expect(page.getByRole("region", { name: "Campaign summary" })).toContainText("Queued");
+
+    // The worker finishes while the page is open.
+    state.campaigns.b1[0].status = "SENT";
+    await page.getByRole("button", { name: "Refresh" }).click();
+    await expect(page.getByRole("region", { name: "Campaign summary" })).toContainText("Sent");
+    await expect(page.getByText(/queued and waiting to be sent/)).toHaveCount(0);
+  });
+
+  test("Results explains an older campaign without a saved recipient list, and an empty delivery", async ({
+    page,
+  }) => {
+    await mockApi(page, {
+      businesses: [bakery],
+      campaigns: { b1: [failedCampaign] },
+      analytics: { "k-5": { analyticsSource: "LEGACY_LOGS" } },
+    });
+    await page.goto("/businesses/b1/campaigns/k-5/analytics");
+
+    await expect(page.getByText(/older campaign without a saved recipient list/)).toBeVisible();
+    await expect(page.getByText("No messages have gone out yet.")).toBeVisible();
+    await expect(page.getByText("No messages have failed.")).toBeVisible();
+    await expect(page.getByText("No customers were skipped.")).toBeVisible();
+  });
+
+  test("a failed results request offers a retry", async ({ page }) => {
+    await mockApi(page, { businesses: [bakery], campaigns: { b1: [sent] }, failAnalyticsFor: ["k-4"] });
+    await page.goto("/businesses/b1/campaigns/k-4/analytics");
+
+    await expect(page.getByRole("heading", { name: "Couldn’t load the results" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
   });
 });

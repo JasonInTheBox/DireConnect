@@ -92,6 +92,9 @@ export type MockAnalytics = Partial<{
   failedDeliveryCount: number;
   pendingCount: number;
   skippedBeforeSendCount: number;
+  skippedByReason: Record<string, number>;
+  failedByReason: Record<string, number>;
+  analyticsSource: "SNAPSHOT" | "LEGACY_LOGS";
 }>;
 
 /** Seeds a signed-in Supabase session; the client reads it locally and does not verify it. */
@@ -245,7 +248,7 @@ function previewFor(target: MockCampaign, customers: MockCustomer[]) {
       eligibleCount: eligible.length,
       skippedCount: skipped.length,
       skippedByReason,
-      isSnapshot: false,
+      isSnapshot: target.status !== "DRAFT",
     },
     eligible,
     skipped,
@@ -510,13 +513,19 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
         if (options.failAnalyticsFor?.includes(campaignId)) {
           return json(500, { error: "Analytics unavailable" });
         }
+        const {
+          skippedByReason = {},
+          failedByReason = {},
+          analyticsSource = "SNAPSHOT",
+          ...counts
+        } = options.analytics?.[campaignId] ?? {};
         const numbers = {
           eligibleCount: 0,
           sentCount: 0,
           failedDeliveryCount: 0,
           pendingCount: 0,
           skippedBeforeSendCount: 0,
-          ...options.analytics?.[campaignId],
+          ...counts,
         };
         const attempted = numbers.sentCount + numbers.failedDeliveryCount + numbers.pendingCount;
         return json(200, {
@@ -528,15 +537,15 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
             status: target.status,
           },
           summary: {
-            analyticsSource: "SNAPSHOT",
-            hasSnapshot: true,
+            analyticsSource,
+            hasSnapshot: analyticsSource === "SNAPSHOT",
             totalSnapshotCount: numbers.eligibleCount + numbers.skippedBeforeSendCount,
             totalRecipientCount: numbers.eligibleCount + numbers.skippedBeforeSendCount,
             attemptedSendCount: attempted,
             totalLogCount: attempted,
             sentRate: attempted > 0 ? Math.round((numbers.sentCount / attempted) * 100) : null,
-            skippedByReason: {},
-            failedByReason: {},
+            skippedByReason,
+            failedByReason,
             ...numbers,
           },
         });
