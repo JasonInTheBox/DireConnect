@@ -45,11 +45,14 @@ export function CampaignWizard({
   businessId,
   businessName,
   campaign,
+  initialStep = "basics",
 }: {
   businessId: string;
   businessName: string;
   /** The draft being edited, or null to create a new campaign. */
   campaign: Campaign | null;
+  /** Edit mode can open on the Review step (the "Review and send" action). */
+  initialStep?: WizardStepId;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -58,7 +61,9 @@ export function CampaignWizard({
   const [values, setValues] = useState<WizardValues>(() => wizardValues(campaign));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
-  const [stepIndex, setStepIndex] = useState(0);
+  const [stepIndex, setStepIndex] = useState(() =>
+    Math.max(0, WIZARD_STEPS.findIndex((item) => item.id === initialStep)),
+  );
   const [draftId, setDraftId] = useState<string | null>(campaign?.id ?? null);
   const [busy, setBusy] = useState<"draft" | "review" | null>(null);
   const inFlight = useRef(false);
