@@ -131,10 +131,10 @@ test.describe("campaign list", () => {
     });
     await page.goto("/businesses/b1/campaigns");
 
-    // Email drafts open in the wizard, never in the legacy one-click Queue page.
+    // Drafts open on the read-only Audience tab; sending goes through the wizard.
     await expect(page.getByRole("link", { name: "Spring menu" })).toHaveAttribute(
       "href",
-      "/businesses/b1/campaigns/k-1/edit",
+      "/businesses/b1/campaigns/k-1/preview",
     );
     await expect(page.getByRole("link", { name: "Text blast" })).toHaveAttribute(
       "href",

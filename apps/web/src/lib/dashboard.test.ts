@@ -150,16 +150,14 @@ describe("setupSteps", () => {
 });
 
 describe("campaignHref", () => {
-  it("opens email drafts in the wizard, SMS drafts in the preview and everything else in the analytics view", () => {
-    expect(campaignHref("b1", { id: "c9", status: "DRAFT", channel: "EMAIL" })).toBe(
-      "/businesses/b1/campaigns/c9/edit",
-    );
-    expect(campaignHref("b1", { id: "c9", status: "DRAFT", channel: "SMS" })).toBe(
-      "/businesses/b1/campaigns/c9/preview",
-    );
+  it("opens drafts on the Audience tab for both channels and everything else on the Results tab", () => {
     for (const channel of ["EMAIL", "SMS"] as const) {
+      // Callers pass whole campaigns, so the channel is present but must not matter.
+      const draft = { id: "c9", status: "DRAFT", channel } as const;
+      expect(campaignHref("b1", draft)).toBe("/businesses/b1/campaigns/c9/preview");
       for (const status of ["QUEUED", "SENT", "FAILED"] as const) {
-        expect(campaignHref("b1", { id: "c9", status, channel })).toBe(
+        const other = { id: "c9", status, channel };
+        expect(campaignHref("b1", other)).toBe(
           "/businesses/b1/campaigns/c9/analytics",
         );
       }

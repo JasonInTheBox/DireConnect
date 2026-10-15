@@ -146,6 +146,45 @@ export type MockDashboardData = {
   recentCampaigns?: MockRecentCampaign[];
 };
 
+export type MockLog = {
+  id: string;
+  ownerId: string;
+  businessId: string;
+  campaignId: string;
+  customerId: string | null;
+  channel: "EMAIL" | "SMS";
+  recipient: string;
+  status: "PENDING" | "SENT" | "FAILED";
+  errorMessage: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function log(
+  id: string,
+  campaignId: string,
+  recipient: string,
+  overrides: Partial<MockLog> = {},
+  businessId = "b1",
+): MockLog {
+  return {
+    id,
+    ownerId: "user-1",
+    businessId,
+    campaignId,
+    customerId: null,
+    channel: "EMAIL",
+    recipient,
+    status: "SENT",
+    errorMessage: null,
+    sentAt: "2026-09-20T12:00:05.000Z",
+    createdAt: "2026-09-20T12:00:00.000Z",
+    updatedAt: "2026-09-20T12:00:05.000Z",
+    ...overrides,
+  };
+}
+
 type ApiMockOptions = {
   businesses: MockBusiness[];
   /** Customers per business id. */
@@ -166,6 +205,8 @@ type ApiMockOptions = {
   campaigns?: Record<string, MockCampaign[]>;
   /** Delivery numbers per campaign id (missing fields are zero). */
   analytics?: Record<string, MockAnalytics>;
+  /** Message logs per campaign id. */
+  logs?: Record<string, MockLog[]>;
   /** Campaign ids whose analytics request fails with a 500. */
   failAnalyticsFor?: string[];
   /** Makes every queue request fail with this status and message. */
@@ -549,6 +590,12 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
             ...numbers,
           },
         });
+      }
+
+      if (campaignId && action === "logs" && request.method() === "GET") {
+        return target
+          ? json(200, options.logs?.[campaignId] ?? [])
+          : json(404, { error: "Campaign not found" });
       }
 
       if (campaignId && action === "preview" && request.method() === "GET") {

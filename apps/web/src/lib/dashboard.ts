@@ -112,19 +112,15 @@ export function showSetupChecklist(steps: SetupStep[]): boolean {
 }
 
 /**
- * Email drafts open in the wizard (the legacy preview page queues in one click, with none of the
- * wizard's checks); SMS drafts, which cannot be edited, keep the preview; everything else opens
- * the results view.
+ * Where a campaign link goes: drafts open on the Audience tab (sending always goes through
+ * the wizard's confirm step); everything else opens on the Results tab.
  */
 export function campaignHref(
   businessId: string,
-  campaign: Pick<DashboardCampaign, "id" | "status" | "channel">,
+  campaign: Pick<DashboardCampaign, "id" | "status">,
 ): string {
-  const base = `/businesses/${businessId}/campaigns/${campaign.id}`;
-  if (campaign.status !== "DRAFT") {
-    return `${base}/analytics`;
-  }
-  return campaign.channel === "EMAIL" ? `${base}/edit` : `${base}/preview`;
+  const section = campaign.status === "DRAFT" ? "preview" : "analytics";
+  return `/businesses/${businessId}/campaigns/${campaign.id}/${section}`;
 }
 
 export function formatDate(iso: string, timeZone?: string): string {

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { business, campaign, customer, mockApi, signIn } from "./helpers/app";
+import { business, campaign, customer, log, mockApi, signIn } from "./helpers/app";
 
 const bakery = business("b1", "Corner Bakery");
 const people = [
@@ -311,6 +311,98 @@ test.describe("campaign detail: Audience and Results", () => {
     await page.goto("/businesses/b1/campaigns/k-4/analytics");
 
     await expect(page.getByRole("heading", { name: "Couldn’t load the results" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+  });
+});
+
+test.describe("campaign detail: Delivery log", () => {
+  test.beforeEach(async ({ page }) => {
+    await signIn(page);
+    await page.setViewportSize({ width: 1400, height: 900 });
+  });
+
+  test("lists every message with its status, send time and failure reason", async ({ page }) => {
+    await mockApi(page, {
+      businesses: [bakery],
+      campaigns: { b1: [sent] },
+      logs: {
+        "k-4": [
+          log("l-1", "k-4", "ada@example.com"),
+          log("l-2", "k-4", "grace@navy.test", {
+            status: "FAILED",
+            sentAt: null,
+            errorMessage: "Daily limit reached for this account",
+          }),
+          log("l-3", "k-4", "alan@bletchley.test", { status: "PENDING", sentAt: null }),
+        ],
+      },
+    });
+    await page.goto("/businesses/b1/campaigns/k-4/logs");
+
+    await expect(page.getByText("3 messages, 1 failed")).toBeVisible();
+    await expect(page.getByRole("row", { name: /ada@example.com/ })).toContainText("Sent");
+    const failedRow = page.getByRole("row", { name: /grace@navy.test/ });
+    await expect(failedRow).toContainText("Failed");
+    await expect(failedRow).toContainText("Not sent");
+    await expect(failedRow).toContainText("Daily limit reached for this account");
+    await expect(page.getByRole("row", { name: /alan@bletchley.test/ })).toContainText("Pending");
+  });
+
+  test("explains the sending limits that can cause a failure", async ({ page }) => {
+    await mockApi(page, { businesses: [bakery], campaigns: { b1: [sent] }, logs: { "k-4": [] } });
+    await page.goto("/businesses/b1/campaigns/k-4/logs");
+
+    const limits = page.getByRole("region", { name: "Why a message can fail" });
+    await expect(limits).toContainText("one campaign email every 24 hours");
+    await expect(limits).toContainText("up to 25 campaign emails");
+    await expect(limits).toContainText("up to 100 campaign emails");
+  });
+
+  test("shows an empty state when nothing has been delivered yet", async ({ page }) => {
+    await mockApi(page, { businesses: [bakery], campaigns: { b1: [queued] }, logs: { "k-3": [] } });
+    await page.goto("/businesses/b1/campaigns/k-3/logs");
+
+    await expect(page.getByRole("heading", { name: "No messages yet" })).toBeVisible();
+  });
+
+  test("uses stacked cards on narrower screens", async ({ page }) => {
+    await mockApi(page, {
+      businesses: [bakery],
+      campaigns: { b1: [sent] },
+      logs: {
+        "k-4": [
+          log("l-2", "k-4", "grace@navy.test", {
+            status: "FAILED",
+            sentAt: null,
+            errorMessage: "Daily limit reached for this account",
+          }),
+        ],
+      },
+    });
+    await page.setViewportSize({ width: 800, height: 900 });
+    await page.goto("/businesses/b1/campaigns/k-4/logs");
+
+    await expect(page.getByRole("table")).toBeHidden();
+    const card = page.getByRole("listitem").filter({ hasText: "grace@navy.test" });
+    await expect(card).toContainText("Failed");
+    await expect(card).toContainText("Daily limit reached for this account");
+  });
+
+  test("a failed request offers a retry", async ({ page }) => {
+    await mockApi(page, { businesses: [bakery], campaigns: { b1: [sent] } });
+    await page.route("**/api/businesses/b1/campaigns/k-4/logs", (route) =>
+      route.request().method() === "GET"
+        ? route.fulfill({
+            status: 500,
+            contentType: "application/json",
+            headers: { "access-control-allow-origin": "*" },
+            body: JSON.stringify({ error: "Logs unavailable" }),
+          })
+        : route.fallback(),
+    );
+    await page.goto("/businesses/b1/campaigns/k-4/logs");
+
+    await expect(page.getByRole("heading", { name: "Couldn’t load the delivery log" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
   });
 });

@@ -154,7 +154,7 @@ test.describe("dashboard", () => {
     );
     await expect(recent.getByRole("link", { name: "Autumn teaser" })).toHaveAttribute(
       "href",
-      "/businesses/b1/campaigns/k-2/edit",
+      "/businesses/b1/campaigns/k-2/preview",
     );
     await expect(recent.getByText("Flash offer")).toBeVisible();
   });

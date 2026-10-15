@@ -1,184 +1,120 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
-import Link from "next/link";
-import { supabase } from "@/lib/supabase";
-import { apiUrl } from "@/lib/api";
+import { useParams } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
+import { Panel } from "@/components/ui/panel";
+import { ListSkeleton } from "@/components/ui/skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/state";
+import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/table";
+import { logStatusMeta, sendLimitNotes } from "@/lib/campaignDetail";
+import { pluralize } from "@/lib/format";
+import { formatDateTime } from "@/lib/schedule";
+import type { MessageLog } from "@/lib/types";
+import { useApi } from "@/lib/useApi";
 
-type MessageLog = {
-  id: string;
-  ownerId: string;
-  businessId: string;
-  campaignId: string;
-  customerId?: string | null;
-  channel: "EMAIL" | "SMS";
-  recipient: string;
-  status: "PENDING" | "SENT" | "FAILED";
-  errorMessage?: string | null;
-  sentAt?: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
+function LogStatus({ status }: { status: MessageLog["status"] }) {
+  const meta = logStatusMeta(status);
+  return (
+    <Badge tone={meta.tone} icon={meta.icon}>
+      {meta.label}
+    </Badge>
+  );
+}
 
-type PageProps = {
-  params: Promise<{
-    businessId: string;
-    campaignId: string;
-  }>;
-};
+function sentAtLabel(log: MessageLog): string {
+  return log.sentAt ? formatDateTime(log.sentAt) : "Not sent";
+}
 
-export default function CampaignLogsPage({ params }: PageProps) {
-  const { businessId, campaignId } = use(params);
+export default function CampaignDeliveryLogPage() {
+  const { businessId, campaignId } = useParams<{ businessId: string; campaignId: string }>();
+  const { data, error, slow, refetch } = useApi<MessageLog[]>(
+    `/api/businesses/${businessId}/campaigns/${campaignId}/logs`,
+  );
 
-  const [logs, setLogs] = useState<MessageLog[]>([]);
-
-  async function fetchLogs() {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      window.location.href = "/login";
-      return;
-    }
-
-    const res = await fetch(
-      apiUrl(`/api/businesses/${businessId}/campaigns/${campaignId}/logs`),
-      {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      }
-    );
-
-    if (!res.ok) {
-        const errorData = await res.json().catch(() => null);
-        console.log("Fetch logs failed:", {
-            status: res.status,
-            errorData,
-        });
-        alert(errorData?.error || `Failed to fetch message logs. Status: ${res.status}`);
-        return;
-    }
-
-    const data = await res.json();
-    setLogs(data);
+  if (data === null && error === null) {
+    return <ListSkeleton rows={3} slow={slow} />;
+  }
+  if (data === null && error) {
+    return <ErrorState title="Couldn’t load the delivery log" message={error.message} onRetry={refetch} />;
+  }
+  if (!data) {
+    return null;
   }
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    window.location.href = "/login";
-  }
-
-  useEffect(() => {
-    fetchLogs();
-  }, []);
-
-  const sentCount = logs.filter((log) => log.status === "SENT").length;
-  const failedCount = logs.filter((log) => log.status === "FAILED").length;
+  const failed = data.filter((log) => log.status === "FAILED").length;
 
   return (
-    <div className="min-h-screen bg-gray-950 px-6 py-8 text-gray-100">
-      <div className="mx-auto max-w-5xl">
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Message Logs</h1>
-            <p className="mt-2 text-gray-400">
-              Review fake-send results for this campaign.
-            </p>
-          </div>
+    <div className="space-y-4">
+      <Panel id="log-limits-heading" title="Why a message can fail">
+        <p className="mt-2 text-sm text-muted">
+          Each failed message below explains what went wrong. Daily sending limits are a common
+          reason:
+        </p>
+        <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm text-muted">
+          {sendLimitNotes().map((note) => (
+            <li key={note}>{note}</li>
+          ))}
+        </ul>
+      </Panel>
 
-          <button
-            onClick={handleLogout}
-            className="rounded-lg bg-gray-800 px-4 py-2 font-medium text-gray-100 hover:bg-gray-700"
-          >
-            Log out
-          </button>
-        </div>
+      {data.length === 0 ? (
+        <EmptyState
+          icon="send"
+          title="No messages yet"
+          description="Messages appear here once the campaign starts sending."
+        />
+      ) : (
+        <>
+          <p className="text-sm text-muted">
+            {pluralize(data.length, "message")}
+            {failed > 0 ? `, ${failed} failed` : ""}
+          </p>
 
-        <div className="mb-6">
-          <Link
-            href={`/businesses/${businessId}/campaigns`}
-            className="text-sm font-medium text-blue-400 hover:underline"
-          >
-            ← Back to Campaigns
-          </Link>
-        </div>
-
-        <section className="mb-8 grid gap-4 md:grid-cols-3">
-          <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
-            <p className="text-sm text-gray-400">Total Logs</p>
-            <p className="mt-2 text-3xl font-bold">{logs.length}</p>
-          </div>
-
-          <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
-            <p className="text-sm text-gray-400">Sent</p>
-            <p className="mt-2 text-3xl font-bold text-green-400">
-              {sentCount}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
-            <p className="text-sm text-gray-400">Failed</p>
-            <p className="mt-2 text-3xl font-bold text-red-400">
-              {failedCount}
-            </p>
-          </div>
-        </section>
-
-        <section>
-          {logs.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-700 bg-gray-900 p-8 text-center text-gray-400">
-              No message logs yet. Queue and process this campaign first.
-            </div>
-          ) : (
-            <ul className="space-y-4">
-              {logs.map((log) => (
-                <li
-                  key={log.id}
-                  className="rounded-xl border border-gray-800 bg-gray-900 p-5 shadow-sm"
-                >
-                  <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold">
+          <div className="hidden lg:block">
+            <Table caption="Delivery log" fixed>
+              <THead>
+                <tr>
+                  <Th className="w-[30%]">Recipient</Th>
+                  <Th className="w-32">Status</Th>
+                  <Th className="w-48">Sent</Th>
+                  <Th>Details</Th>
+                </tr>
+              </THead>
+              <TBody>
+                {data.map((log) => (
+                  <Tr key={log.id}>
+                    <Td className="overflow-hidden">
+                      <div className="truncate font-medium text-ink" title={log.recipient}>
                         {log.recipient}
-                      </h3>
-                      <p className="mt-1 text-sm text-gray-400">
-                        Channel: {log.channel}
-                      </p>
-                    </div>
+                      </div>
+                    </Td>
+                    <Td>
+                      <LogStatus status={log.status} />
+                    </Td>
+                    <Td className="text-muted">{sentAtLabel(log)}</Td>
+                    <Td className="break-words text-muted">{log.errorMessage || "—"}</Td>
+                  </Tr>
+                ))}
+              </TBody>
+            </Table>
+          </div>
 
-                    <span
-                      className={
-                        log.status === "SENT"
-                          ? "rounded-full bg-green-950 px-3 py-1 text-xs font-semibold text-green-300"
-                          : log.status === "FAILED"
-                            ? "rounded-full bg-red-950 px-3 py-1 text-xs font-semibold text-red-300"
-                            : "rounded-full bg-gray-800 px-3 py-1 text-xs font-semibold text-gray-300"
-                      }
-                    >
-                      {log.status}
-                    </span>
-                  </div>
-
-                  <p className="text-sm text-gray-400">
-                    Sent at:{" "}
-                    {log.sentAt
-                      ? new Date(log.sentAt).toLocaleString()
-                      : "Not sent"}
-                  </p>
-
-                  {log.errorMessage && (
-                    <p className="mt-2 text-sm text-red-300">
-                      Error: {log.errorMessage}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
+          <ul className="space-y-2 lg:hidden" aria-label="Delivery log">
+            {data.map((log) => (
+              <li key={log.id} className="rounded-container border border-line bg-surface p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="min-w-0 break-words text-sm font-medium text-ink">{log.recipient}</p>
+                  <LogStatus status={log.status} />
+                </div>
+                <p className="mt-1 text-[13px] text-muted">{sentAtLabel(log)}</p>
+                {log.errorMessage ? (
+                  <p className="mt-1 break-words text-[13px] text-ink">{log.errorMessage}</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }
