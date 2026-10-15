@@ -2,7 +2,7 @@ import { Icon, type IconName } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { deliverySegments, successRateLabel, type DeliverySegment } from "@/lib/dashboard";
 import type { DashboardSummary } from "@/lib/types";
-import { Panel } from "./panel";
+import { Panel } from "@/components/ui/panel";
 
 // Status colours are reserved for status; each state also has an icon and a word in the legend.
 const STYLE: Record<DeliverySegment["key"], { fill: string; icon: IconName; iconColor: string }> = {
@@ -11,7 +11,13 @@ const STYLE: Record<DeliverySegment["key"], { fill: string; icon: IconName; icon
   pending: { fill: "bg-warning", icon: "clock", iconColor: "text-warning" },
 };
 
-export function DeliveryPanel({ messages }: { messages: DashboardSummary["messages"] }) {
+export function DeliveryPanel({
+  messages,
+  emptyText = "No messages sent yet. Results appear here after your first campaign goes out.",
+}: {
+  messages: DashboardSummary["messages"];
+  emptyText?: string;
+}) {
   const segments = deliverySegments(messages);
   const drawn = segments.filter((segment) => segment.count > 0);
   const rate = successRateLabel(messages);
@@ -19,9 +25,7 @@ export function DeliveryPanel({ messages }: { messages: DashboardSummary["messag
   return (
     <Panel id="delivery-heading" title="Delivery">
       {segments.length === 0 ? (
-        <p className="mt-2 text-sm text-muted">
-          No messages sent yet. Results appear here after your first campaign goes out.
-        </p>
+        <p className="mt-2 text-sm text-muted">{emptyText}</p>
       ) : (
         <>
           <div

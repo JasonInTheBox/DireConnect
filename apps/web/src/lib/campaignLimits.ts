@@ -5,4 +5,6 @@
 export const CAMPAIGN_LIMITS = {
   maxRecipientsPerCampaign: 10,
   maxEmailsPerRecipientPer24Hours: 1,
+  maxEmailsPerAccountPer24Hours: 25,
+  maxEmailsPerPlatformPer24Hours: 100,
 } as const;

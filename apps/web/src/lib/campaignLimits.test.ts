@@ -11,5 +11,11 @@ describe("CAMPAIGN_LIMITS", () => {
     expect(CAMPAIGN_LIMITS.maxEmailsPerRecipientPer24Hours).toBe(
       CAMPAIGN_EMAIL_SAFETY_LIMITS.maxEmailsPerRecipientPer24Hours,
     );
+    expect(CAMPAIGN_LIMITS.maxEmailsPerAccountPer24Hours).toBe(
+      CAMPAIGN_EMAIL_SAFETY_LIMITS.maxEmailsPerAccountPer24Hours,
+    );
+    expect(CAMPAIGN_LIMITS.maxEmailsPerPlatformPer24Hours).toBe(
+      CAMPAIGN_EMAIL_SAFETY_LIMITS.maxEmailsPerPlatformPer24Hours,
+    );
   });
 });

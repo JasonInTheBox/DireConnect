@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CampaignStatusBadge } from "@/components/campaigns/status-badge";
 import { buttonClasses } from "@/components/ui/button";
 import type { DashboardSummary } from "@/lib/types";
-import { Panel, PanelRow } from "./panel";
+import { Panel, PanelRow } from "@/components/ui/panel";
 
 export function CampaignsPanel({
   businessId,

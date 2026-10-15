@@ -3,7 +3,7 @@ import { CampaignStatusBadge } from "@/components/campaigns/status-badge";
 import { campaignHref, formatDate } from "@/lib/dashboard";
 import { channelLabel } from "@/lib/campaignStatus";
 import type { DashboardCampaign } from "@/lib/types";
-import { Panel } from "./panel";
+import { Panel } from "@/components/ui/panel";
 
 export function RecentCampaigns({
   businessId,

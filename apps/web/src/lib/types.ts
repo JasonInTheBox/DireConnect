@@ -108,3 +108,18 @@ export type CampaignPreviewResponse = {
   eligible: PreviewRecipient[];
   skipped: PreviewRecipient[];
 };
+
+export type MessageLog = {
+  id: string;
+  ownerId: string;
+  businessId: string;
+  campaignId: string;
+  customerId?: string | null;
+  channel: CampaignChannel;
+  recipient: string;
+  status: "PENDING" | "SENT" | "FAILED";
+  errorMessage?: string | null;
+  sentAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
