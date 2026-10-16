@@ -167,8 +167,11 @@ describe("sendBlocks", () => {
   it("blocks more than the limit and states both numbers", () => {
     const blocks = sendBlocks({ eligibleCount: 11, emailConfirmed: true });
     expect(blocks.map((block) => block.code)).toEqual(["over-limit"]);
+    expect(blocks[0].title).toBe("Too many recipients for now");
     expect(blocks[0].message).toContain("10");
     expect(blocks[0].message).toContain("11");
+    expect(blocks[0].message).toMatch(/aren’t available yet/);
+    expect(blocks[0].message).not.toMatch(/Update your customers/);
   });
 
   it("blocks an unconfirmed email address", () => {

@@ -533,3 +533,185 @@ test.describe("campaign detail: Delivery log", () => {
     await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
   });
 });
+
+test.describe("campaign detail: auto-refresh and failed campaigns", () => {
+  test.beforeEach(async ({ page }) => {
+    await signIn(page);
+    await page.setViewportSize({ width: 1400, height: 900 });
+  });
+
+  test("a queued campaign refreshes on its own, and stops once it is sent", async ({ page }) => {
+    const analytics: Record<string, { eligibleCount: number; pendingCount?: number; sentCount?: number }> = {
+      "k-3": { eligibleCount: 3, pendingCount: 3 },
+    };
+    // The clock is installed before the first load so the 15 second timer can be fast-forwarded.
+    await page.clock.install();
+    const state = await mockApi(page, { businesses: [bakery], campaigns: { b1: [queued] }, analytics });
+    const analyticsGets = () =>
+      state.requests.filter((request) => request.method === "GET" && request.path.endsWith("/k-3/analytics"))
+        .length;
+    await page.goto("/businesses/b1/campaigns/k-3/analytics");
+
+    await expect(page.getByText(/queued and waiting to be sent/)).toBeVisible();
+    await expect(page.getByRole("region", { name: "Delivery", exact: true })).toContainText("Pending3");
+    const initial = analyticsGets();
+    expect(initial).toBe(1);
+
+    await page.clock.runFor(16_000);
+    await expect.poll(analyticsGets).toBeGreaterThan(initial);
+
+    // The worker finishes; the next tick picks up the new status and the polling stops.
+    state.campaigns.b1[0].status = "SENT";
+    analytics["k-3"] = { eligibleCount: 3, sentCount: 3 };
+    await page.clock.runFor(16_000);
+    await expect(page.getByRole("region", { name: "Campaign summary" })).toContainText("Sent");
+    await expect(page.getByRole("region", { name: "Delivery", exact: true })).not.toContainText("Pending3");
+
+    const settled = analyticsGets();
+    await page.clock.runFor(60_000);
+    await page.waitForTimeout(300);
+    expect(analyticsGets()).toBe(settled);
+  });
+
+  test("a sent campaign is never refreshed on a timer", async ({ page }) => {
+    await page.clock.install();
+    const state = await mockApi(page, {
+      businesses: [bakery],
+      campaigns: { b1: [sent] },
+      analytics: { "k-4": { eligibleCount: 2, sentCount: 2 } },
+    });
+    await page.goto("/businesses/b1/campaigns/k-4/analytics");
+    await expect(page.getByRole("region", { name: "Delivery", exact: true })).toContainText("Sent");
+
+    await page.clock.runFor(60_000);
+    await page.waitForTimeout(300);
+    expect(
+      state.requests.filter((request) => request.method === "GET" && request.path.endsWith("/k-4/analytics"))
+        .length,
+    ).toBe(1);
+  });
+
+  test("a tick that arrives while a refresh is still running is skipped", async ({ page }) => {
+    await page.clock.install();
+    await mockApi(page, {
+      businesses: [bakery],
+      campaigns: { b1: [queued] },
+      analytics: { "k-3": { eligibleCount: 3, pendingCount: 3 } },
+    });
+    let gets = 0;
+    await page.route("**/api/businesses/b1/campaigns/k-3/analytics", async (route) => {
+      gets += 1;
+      if (gets === 2) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+      await route.fallback();
+    });
+    await page.goto("/businesses/b1/campaigns/k-3/analytics");
+    await expect(page.getByText(/queued and waiting to be sent/)).toBeVisible();
+
+    await page.clock.runFor(16_000);
+    await expect(page.getByText("Refreshing…")).toBeVisible();
+    // The next ticks arrive while the second request is still running; they are skipped.
+    await page.clock.runFor(20_000);
+    await expect(page.getByText("Refreshing…")).toHaveCount(0);
+    // Counted at the route, because a request that is cancelled mid-flight never reaches the mock.
+    expect(gets).toBe(2);
+  });
+
+  test("Delivery log has a Refresh button; a failed refresh keeps the rows and Try again recovers", async ({
+    page,
+  }) => {
+    await mockApi(page, {
+      businesses: [bakery],
+      campaigns: { b1: [sent] },
+      logs: { "k-4": [log("l-1", "k-4", "ada@example.com")] },
+    });
+    let gets = 0;
+    await page.route("**/api/businesses/b1/campaigns/k-4/logs", async (route) => {
+      gets += 1;
+      if (gets === 2) {
+        await route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          headers: { "access-control-allow-origin": "*" },
+          body: JSON.stringify({ error: "Logs unavailable" }),
+        });
+        return;
+      }
+      await route.fallback();
+    });
+    await page.goto("/businesses/b1/campaigns/k-4/logs");
+    await expect(page.getByRole("row", { name: /ada@example.com/ })).toBeVisible();
+
+    await page.getByRole("button", { name: "Refresh" }).click();
+    const notice = page.getByRole("alert").filter({ hasText: "Couldn’t refresh. Showing the earlier numbers." });
+    await expect(notice).toBeVisible();
+    await expect(page.getByRole("row", { name: /ada@example.com/ })).toBeVisible();
+
+    await notice.getByRole("button", { name: "Try again" }).click();
+    await expect(notice).toHaveCount(0);
+    await expect(page.getByRole("row", { name: /ada@example.com/ })).toBeVisible();
+    expect(gets).toBe(3);
+  });
+
+  test("Delivery log says it is refreshing while a reload runs", async ({ page }) => {
+    await mockApi(page, {
+      businesses: [bakery],
+      campaigns: { b1: [sent] },
+      logs: { "k-4": [log("l-1", "k-4", "ada@example.com")] },
+    });
+    let gets = 0;
+    await page.route("**/api/businesses/b1/campaigns/k-4/logs", async (route) => {
+      gets += 1;
+      if (gets === 2) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+      await route.fallback();
+    });
+    await page.goto("/businesses/b1/campaigns/k-4/logs");
+    await expect(page.getByRole("row", { name: /ada@example.com/ })).toBeVisible();
+
+    const refresh = page.getByRole("button", { name: "Refresh" });
+    await refresh.click();
+    await expect(page.getByText("Refreshing…")).toBeVisible();
+    await expect(refresh).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByText("Refreshing…")).toHaveCount(0);
+    expect(gets).toBe(2);
+  });
+
+  test("Delivery log of a queued campaign refreshes on its own", async ({ page }) => {
+    await page.clock.install();
+    const logs = { "k-3": [log("l-1", "k-3", "ada@example.com", { status: "PENDING", sentAt: null })] };
+    const state = await mockApi(page, { businesses: [bakery], campaigns: { b1: [queued] }, logs });
+    const logGets = () =>
+      state.requests.filter((request) => request.method === "GET" && request.path.endsWith("/k-3/logs")).length;
+    await page.goto("/businesses/b1/campaigns/k-3/logs");
+    await expect(page.getByRole("row", { name: /ada@example.com/ })).toContainText("Pending");
+    expect(logGets()).toBe(1);
+
+    logs["k-3"] = [log("l-1", "k-3", "ada@example.com")];
+    await page.clock.runFor(16_000);
+    await expect.poll(logGets).toBeGreaterThan(1);
+    await expect(page.getByRole("row", { name: /ada@example.com/ })).toContainText("Sent");
+  });
+
+  test("a failed campaign says it did not finish and names the most common reason", async ({ page }) => {
+    await mockApi(page, {
+      businesses: [bakery],
+      campaigns: { b1: [failedCampaign] },
+      analytics: {
+        "k-5": {
+          eligibleCount: 4,
+          failedDeliveryCount: 4,
+          failedByReason: { "Mailbox does not exist": 3, "Daily limit reached for this account": 1 },
+        },
+      },
+    });
+    await page.goto("/businesses/b1/campaigns/k-5/analytics");
+
+    await expect(
+      page.getByText("Most messages failed because: Mailbox does not exist (3 of 4).", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("This campaign didn’t finish sending.", { exact: true })).toBeVisible();
+  });
+});

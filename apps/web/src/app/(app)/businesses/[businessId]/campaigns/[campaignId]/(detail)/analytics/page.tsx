@@ -3,14 +3,15 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCampaign } from "@/components/campaigns/detail/campaign-context";
+import { RefreshBar } from "@/components/campaigns/detail/refresh-bar";
 import { DeliveryPanel } from "@/components/dashboard/delivery-panel";
-import { Button, buttonClasses } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icons";
+import { buttonClasses } from "@/components/ui/button";
 import { Panel, PanelRow } from "@/components/ui/panel";
 import { ListSkeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/state";
 import {
   detailHref,
+  failureHeadline,
   failureReasons,
   headerActionsFor,
   LEGACY_ANALYTICS_NOTE,
@@ -19,6 +20,7 @@ import {
 import { skippedReasons } from "@/lib/campaignDisplay";
 import type { CampaignAnalyticsResponse } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
+import { shouldAutoRefresh, useAutoRefresh } from "@/lib/useAutoRefresh";
 
 export default function CampaignResultsPage() {
   const { businessId, campaignId } = useParams<{ businessId: string; campaignId: string }>();
@@ -28,6 +30,21 @@ export default function CampaignResultsPage() {
   const { data, error, loading, slow, refetch } = useApi<CampaignAnalyticsResponse>(
     isDraft ? null : `/api/businesses/${businessId}/campaigns/${campaignId}/analytics`,
   );
+
+  const refreshing = loading || campaignRefreshing;
+
+  function refresh() {
+    refetch();
+    refetchCampaign();
+  }
+
+  // Hooks run before any early return. A tick is skipped while a reload is still running, so
+  // slow responses never stack or cancel each other.
+  useAutoRefresh(shouldAutoRefresh({ status: campaign.status, visible: true }), () => {
+    if (!refreshing) {
+      refresh();
+    }
+  });
 
   if (isDraft) {
     const canSend = headerActionsFor(campaign).send;
@@ -63,50 +80,23 @@ export default function CampaignResultsPage() {
   const { summary } = data;
   const skipped = skippedReasons(summary.skippedByReason);
   const failures = failureReasons(summary.failedByReason);
-  const refreshing = loading || campaignRefreshing;
-
-  function refresh() {
-    // Not disabled (that would drop keyboard focus), so ignore clicks while a reload is running.
-    if (refreshing) {
-      return;
-    }
-    refetch();
-    refetchCampaign();
-  }
+  const headline = campaign.status === "FAILED" ? failureHeadline(summary.failedByReason) : null;
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="max-w-prose space-y-1">
-          {resultsNotes(campaign).map((note) => (
-            <p key={note} className="text-sm text-muted">
-              {note}
-            </p>
-          ))}
-          {summary.analyticsSource === "LEGACY_LOGS" ? (
-            <p className="text-sm text-ink">{LEGACY_ANALYTICS_NOTE}</p>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-3">
-          <span role="status" aria-live="polite" className="text-sm text-muted">
-            {refreshing ? "Refreshing…" : ""}
-          </span>
-          <Button onClick={refresh} aria-disabled={refreshing || undefined}>
-            <Icon name="clock" />
-            Refresh
-          </Button>
-        </div>
+      <div className="max-w-prose space-y-1">
+        {headline ? <p className="text-sm font-medium text-ink">{headline}</p> : null}
+        {resultsNotes(campaign).map((note) => (
+          <p key={note} className="text-sm text-muted">
+            {note}
+          </p>
+        ))}
+        {summary.analyticsSource === "LEGACY_LOGS" ? (
+          <p className="text-sm text-ink">{LEGACY_ANALYTICS_NOTE}</p>
+        ) : null}
       </div>
 
-      {error ? (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-control border border-warning bg-warning-soft px-3 py-2 text-sm"
-        >
-          <p className="min-w-0 text-ink">Couldn’t refresh. Showing the earlier numbers.</p>
-          <Button onClick={refresh}>Try again</Button>
-        </div>
-      ) : null}
+      <RefreshBar refreshing={refreshing} failed={error !== null} onRefresh={refresh} />
 
       <DeliveryPanel
         messages={{

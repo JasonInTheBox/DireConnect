@@ -53,11 +53,26 @@ export function StepRecipients({
             </p>
           </div>
         ) : (
-          <p className="text-sm text-ink">
-            <span className="font-semibold">{pluralize(optedInCount, "customer")}</span>{" "}
-            {optedInCount === 1 ? "has" : "have"} agreed to receive emails. The exact list, minus
-            anyone without an email address, is checked on the last step.
-          </p>
+          <>
+            <p className="text-sm text-ink">
+              <span className="font-semibold">{pluralize(optedInCount, "customer")}</span>{" "}
+              {optedInCount === 1 ? "has" : "have"} agreed to receive emails. The exact list, minus
+              anyone without an email address, is checked on the last step.
+            </p>
+            {optedInCount > maxRecipientsPerCampaign ? (
+              <div className="rounded-control border border-warning bg-warning-soft px-3 py-2.5 text-sm">
+                <p className="font-medium text-warning">
+                  More customers opted in than one campaign can reach
+                </p>
+                <p className="mt-0.5 text-ink">
+                  {optedInCount} customers have agreed to receive emails, but DireConnect limits each
+                  campaign to {maxRecipientsPerCampaign} recipients while sending is in early access.
+                  You can write the campaign now; sending will be blocked until it would reach{" "}
+                  {maxRecipientsPerCampaign} or fewer.
+                </p>
+              </div>
+            ) : null}
+          </>
         )}
       </div>
 

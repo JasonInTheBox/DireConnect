@@ -1,6 +1,8 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { useCampaign } from "@/components/campaigns/detail/campaign-context";
+import { RefreshBar } from "@/components/campaigns/detail/refresh-bar";
 import { Badge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
 import { ListSkeleton } from "@/components/ui/skeleton";
@@ -11,6 +13,7 @@ import { pluralize } from "@/lib/format";
 import { formatDateTime } from "@/lib/schedule";
 import type { MessageLog } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
+import { shouldAutoRefresh, useAutoRefresh } from "@/lib/useAutoRefresh";
 
 function LogStatus({ status }: { status: MessageLog["status"] }) {
   const meta = logStatusMeta(status);
@@ -27,9 +30,24 @@ function sentAtLabel(log: MessageLog): string {
 
 export default function CampaignDeliveryLogPage() {
   const { businessId, campaignId } = useParams<{ businessId: string; campaignId: string }>();
-  const { data, error, slow, refetch } = useApi<MessageLog[]>(
+  const { campaign, refetch: refetchCampaign, refreshing: campaignRefreshing } = useCampaign();
+  const { data, error, loading, slow, refetch } = useApi<MessageLog[]>(
     `/api/businesses/${businessId}/campaigns/${campaignId}/logs`,
   );
+  const refreshing = loading || campaignRefreshing;
+
+  function refresh() {
+    refetch();
+    refetchCampaign();
+  }
+
+  // Hooks run before any early return. A tick is skipped while a reload is still running, so
+  // slow responses never stack or cancel each other.
+  useAutoRefresh(shouldAutoRefresh({ status: campaign.status, visible: true }), () => {
+    if (!refreshing) {
+      refresh();
+    }
+  });
 
   if (data === null && error === null) {
     return <ListSkeleton rows={3} slow={slow} />;
@@ -45,6 +63,8 @@ export default function CampaignDeliveryLogPage() {
 
   return (
     <div className="space-y-4">
+      <RefreshBar refreshing={refreshing} failed={error !== null} onRefresh={refresh} />
+
       <Panel id="log-limits-heading" title="Why a message can fail">
         <p className="mt-2 text-sm text-muted">
           Each failed message below explains what went wrong. Daily sending limits are a common

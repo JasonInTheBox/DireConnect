@@ -109,8 +109,8 @@ export function sendBlocks({
   if (eligibleCount > max) {
     blocks.push({
       code: "over-limit",
-      title: "Too many recipients",
-      message: `Campaigns are limited to ${pluralize(max, "recipient")} for now, and this one would reach ${eligibleCount}. Update your customers so ${max} or fewer can receive it, then check again.`,
+      title: "Too many recipients for now",
+      message: `DireConnect limits each campaign to ${pluralize(max, "recipient")} while sending is in early access, and this one would reach ${eligibleCount}. Larger campaigns aren’t available yet. Only turn off email consent for customers who have actually asked not to hear from you.`,
     });
   }
 

@@ -485,13 +485,24 @@ test.describe("campaign wizard: review and send", () => {
     );
     await mockApi(page, { businesses: [bakery], customers: { b1: crowd } });
     await page.goto("/businesses/b1/campaigns/new");
-    await goToMessageStep(page, "Autumn menu");
+    await page.getByLabel("Campaign name").fill("Autumn menu");
+    await page.getByRole("button", { name: "Continue" }).click();
+
+    // The Recipients step already says the audience is larger than one campaign can reach.
+    const warning = page.getByText("More customers opted in than one campaign can reach");
+    await expect(warning).toBeVisible();
+    await expect(page.getByText(/11 customers have agreed to receive emails, but DireConnect limits/)).toBeVisible();
+    await expect(page.getByText(/sending will be blocked until it would reach 10 or fewer/)).toBeVisible();
+
+    await page.getByRole("button", { name: "Continue" }).click();
     await page.getByRole("textbox", { name: "Message" }).fill("Fresh loaves.");
     await page.getByRole("button", { name: "Review" }).click();
 
-    await expect(page.getByText("Too many recipients")).toBeVisible();
-    await expect(page.getByText(/limited to 10 recipients/)).toBeVisible();
+    await expect(page.getByText("Too many recipients for now")).toBeVisible();
+    await expect(page.getByText(/limits each campaign to 10 recipients/)).toBeVisible();
     await expect(page.getByText(/would reach 11/)).toBeVisible();
+    await expect(page.getByText(/aren’t available yet/)).toBeVisible();
+    await expect(page.getByText(/Update your customers/)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Send now" })).toBeDisabled();
   });
 

@@ -67,6 +67,8 @@ export function resultsNotes(
     );
   } else if (key === "QUEUED") {
     notes.push("This campaign is queued and waiting to be sent. Results appear as messages go out.");
+  } else if (key === "FAILED") {
+    notes.push("This campaign didn’t finish sending.");
   }
 
   notes.push(
@@ -115,4 +117,16 @@ export function failureReasons(
   return Object.entries(failedByReason)
     .map(([label, count]) => ({ label, count }))
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+/** One sentence naming why messages failed, for the top of the Results tab. */
+export function failureHeadline(failedByReason: Record<string, number>): string | null {
+  const reasons = failureReasons(failedByReason);
+  if (reasons.length === 0) {
+    return null;
+  }
+  const total = reasons.reduce((sum, reason) => sum + reason.count, 0);
+  const top = reasons[0];
+  const lead = reasons.length === 1 ? "Messages failed because:" : "Most messages failed because:";
+  return `${lead} ${top.label} (${top.count} of ${total}).`;
 }

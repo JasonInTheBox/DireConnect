@@ -4,6 +4,7 @@ import {
   DETAIL_TABS,
   defaultDetailSegment,
   detailHref,
+  failureHeadline,
   failureReasons,
   headerActionsFor,
   logStatusMeta,
@@ -89,6 +90,13 @@ describe("resultsNotes", () => {
     expect(scheduled).toHaveLength(2);
     expect(scheduled[0]).toMatch(/scheduled for Feb 1, 2030/);
   });
+
+  it("says when a campaign did not finish sending", () => {
+    const notes = resultsNotes({ status: "FAILED", sendAt: null }, now, "UTC");
+    expect(notes).toHaveLength(2);
+    expect(notes[0]).toBe("This campaign didn’t finish sending.");
+    expect(notes[1]).toMatch(/background/);
+  });
 });
 
 describe("sendLimitNotes", () => {
@@ -126,5 +134,23 @@ describe("failureReasons", () => {
 
   it("returns nothing when there were no failures", () => {
     expect(failureReasons({})).toEqual([]);
+  });
+});
+
+describe("failureHeadline", () => {
+  it("names the most common failure reason", () => {
+    expect(
+      failureHeadline({ "Mailbox does not exist": 3, "Daily limit reached for this account": 1 }),
+    ).toBe("Most messages failed because: Mailbox does not exist (3 of 4).");
+  });
+
+  it("is plain when there is a single reason", () => {
+    expect(failureHeadline({ "Daily limit reached for this account": 2 })).toBe(
+      "Messages failed because: Daily limit reached for this account (2 of 2).",
+    );
+  });
+
+  it("returns null when nothing failed", () => {
+    expect(failureHeadline({})).toBeNull();
   });
 });
