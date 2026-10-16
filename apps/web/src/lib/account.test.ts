@@ -44,12 +44,23 @@ describe("validatePasswordForm", () => {
 });
 
 describe("isWrongPassword", () => {
-  it("recognises a refused sign-in but not a network failure or a rate limit", () => {
+  it("recognises a refused sign-in", () => {
     expect(isWrongPassword({ code: "invalid_credentials", status: 400 })).toBe(true);
-    expect(isWrongPassword({ status: 400 })).toBe(true);
+  });
+
+  it("does not call other refusals of the password grant a wrong password", () => {
+    expect(isWrongPassword({ code: "captcha_failed", status: 400 })).toBe(false);
+    expect(isWrongPassword({ code: "email_not_confirmed", status: 400 })).toBe(false);
+    expect(isWrongPassword({ code: "validation_failed", status: 400 })).toBe(false);
     expect(isWrongPassword({ code: "over_request_rate_limit", status: 429 })).toBe(false);
+  });
+
+  it("treats a bare 400 without an error code as wrong credentials, and nothing else", () => {
+    expect(isWrongPassword({ status: 400 })).toBe(true);
+    expect(isWrongPassword({ status: 429 })).toBe(false);
     expect(isWrongPassword({ name: "AuthRetryableFetchError", status: 0 })).toBe(false);
     expect(isWrongPassword(null)).toBe(false);
+    expect(isWrongPassword("nope")).toBe(false);
   });
 });
 

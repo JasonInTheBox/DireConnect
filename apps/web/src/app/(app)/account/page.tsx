@@ -177,10 +177,16 @@ function PasswordPanel() {
         );
         return;
       }
-      const { error: verifyError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: values.current,
-      });
+      let verifyError: unknown = null;
+      try {
+        ({ error: verifyError } = await supabase.auth.signInWithPassword({
+          email: user.email,
+          password: values.current,
+        }));
+      } catch {
+        setFormError("Could not check your current password. Try again.");
+        return;
+      }
       if (verifyError) {
         if (isWrongPassword(verifyError)) {
           focusAfterRender.current = true;

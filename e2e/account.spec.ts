@@ -93,6 +93,30 @@ test.describe("account page", () => {
     expect(attempt?.body).toMatchObject({ email: "owner@example.com", password: "not-my-password" });
   });
 
+  test("a refused check that is not a wrong password shows as a form error and changes nothing", async ({
+    page,
+  }) => {
+    await signIn(page);
+    const state = await mockApi(page, {
+      businesses: [bakery],
+      authErrors: {
+        signIn: { status: 400, code: "email_not_confirmed", message: "Email not confirmed" },
+      },
+    });
+    await page.goto("/account");
+
+    await fillPasswordForm(page, "old-password", "a-better-password");
+
+    await expect(page.getByRole("alert").filter({ hasText: "Email not confirmed" })).toBeVisible();
+    await expect(page.getByText("That isn’t your current password.")).toHaveCount(0);
+    await expect(field(page, "New password")).toHaveValue("a-better-password");
+    await expect(page.getByText("Password changed")).toHaveCount(0);
+
+    await page.waitForTimeout(500);
+    expect(userUpdates(state)).toHaveLength(0);
+    expect(state.authRequests.some((request) => request.path === "/auth/v1/logout")).toBe(false);
+  });
+
   test("changes the password, ends the other sessions and clears the fields", async ({ page }) => {
     await signIn(page);
     const state = await mockApi(page, { businesses: [bakery] });

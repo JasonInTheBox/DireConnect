@@ -213,10 +213,15 @@ type ApiMockOptions = {
   queueError?: { status: number; error: string };
   /**
    * Makes Supabase auth calls fail: `updateUser` answers 422 with this message, `signIn` (the
-   * password grant used to check the current password) answers 400 invalid credentials, and
+   * password grant used to check the current password) answers 400 invalid credentials, or the given
+   * status, code and message, and
    * `signOutOthers` makes `logout?scope=others` answer 500 with this message.
    */
-  authErrors?: { updateUser?: string; signIn?: string; signOutOthers?: string };
+  authErrors?: {
+    updateUser?: string;
+    signIn?: string | { status: number; code: string; message: string };
+    signOutOthers?: string;
+  };
   /** When true, a refreshed session reports the email as confirmed. */
   confirmedAfterRefresh?: boolean;
 };
@@ -384,11 +389,16 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
     }
     if (url.pathname === "/auth/v1/token" && request.method() === "POST") {
       const passwordGrant = url.searchParams.get("grant_type") === "password";
-      if (passwordGrant && options.authErrors?.signIn) {
-        return json(400, {
-          code: 400,
-          error_code: "invalid_credentials",
-          msg: "Invalid login credentials",
+      const signInError = options.authErrors?.signIn;
+      if (passwordGrant && signInError) {
+        const refusal =
+          typeof signInError === "string"
+            ? { status: 400, code: "invalid_credentials", message: "Invalid login credentials" }
+            : signInError;
+        return json(refusal.status, {
+          code: refusal.status,
+          error_code: refusal.code,
+          msg: refusal.message,
         });
       }
       return json(200, {
@@ -397,7 +407,7 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
         token_type: "bearer",
         expires_in: 86_400,
         expires_at: Math.floor(Date.now() / 1000) + 86_400,
-        // A password sign-in only works for a confirmed user; a refresh follows the option.
+        // A password sign-in returns a confirmed user so the Account badge does not flip; a refresh follows the option.
         user: user(passwordGrant || Boolean(options.confirmedAfterRefresh)),
       });
     }

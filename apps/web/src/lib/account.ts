@@ -20,15 +20,19 @@ export function validatePasswordForm(values: PasswordFormValues): Record<string,
 }
 
 /**
- * True when Supabase refused the sign-in because the password is wrong. Network failures and rate
- * limits are not a wrong password and must not be reported as one.
+ * True when Supabase refused the sign-in because the password is wrong. Other refusals (captcha,
+ * unconfirmed email, rate limits) and network failures are not a wrong password and must not be
+ * reported as one. A bare 400 with no error code is treated as wrong credentials.
  */
 export function isWrongPassword(error: unknown): boolean {
   if (typeof error !== "object" || error === null) {
     return false;
   }
   const { code, status } = error as { code?: unknown; status?: unknown };
-  return code === "invalid_credentials" || status === 400;
+  if (code === undefined || code === null) {
+    return status === 400;
+  }
+  return code === "invalid_credentials";
 }
 
 /** Supabase explains password problems in plain English; those belong beside the field. */
