@@ -18,17 +18,30 @@ export function shouldAutoRefresh({
 
 /**
  * Calls `refetch` every `intervalMs` while `active`, and once when a hidden tab becomes visible
- * again. The timer is cleared as soon as `active` turns false or the page unmounts.
+ * again. The timer is cleared as soon as `active` turns false or the page unmounts. When `active`
+ * turns from true to false (the campaign finished), `onStop` runs once so the final numbers are
+ * read after the status changed rather than alongside it.
  */
 export function useAutoRefresh(
   active: boolean,
   refetch: () => void,
   intervalMs: number = AUTO_REFRESH_MS,
+  onStop?: () => void,
 ): void {
   const latest = useRef(refetch);
+  const latestStop = useRef(onStop);
+  const wasActive = useRef(active);
   useEffect(() => {
     latest.current = refetch;
-  }, [refetch]);
+    latestStop.current = onStop;
+  }, [refetch, onStop]);
+
+  useEffect(() => {
+    if (wasActive.current && !active) {
+      latestStop.current?.();
+    }
+    wasActive.current = active;
+  }, [active]);
 
   useEffect(() => {
     if (!active) {

@@ -15,6 +15,7 @@ import { DETAIL_TABS, detailHref } from "@/lib/campaignDetail";
 import { pageTitle } from "@/lib/pageTitle";
 import type { Campaign } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
+import { useReloadFailed } from "@/lib/useRefreshState";
 
 export default function CampaignDetailLayout({ children }: { children: ReactNode }) {
   const { businessId, campaignId } = useParams<{ businessId: string; campaignId: string }>();
@@ -40,6 +41,8 @@ function CampaignDetailShell({
   // The API has no single-campaign endpoint, so read the list and find the campaign.
   const { data, error, loading, slow, refetch } = useApi<Campaign[]>(`/api/businesses/${businessId}/campaigns`);
   const campaign = data?.find((item) => item.id === campaignId) ?? null;
+  // Stays true through an outage, so the notice is not unmounted and re-announced on every attempt.
+  const reloadFailed = useReloadFailed(error !== null, loading);
 
   // Until the campaign loads there is no header to name the page.
   const placeholderTitle = <title>{pageTitle("Campaign")}</title>;
@@ -85,11 +88,11 @@ function CampaignDetailShell({
       campaign={campaign}
       refetch={refetch}
       refreshing={loading}
-      refreshError={error !== null}
+      refreshError={reloadFailed}
     >
       <PageContainer>
         <CampaignHeader businessId={businessId} businessName={businessName} campaign={campaign} />
-        {error ? (
+        {reloadFailed ? (
           <div
             role="alert"
             className="-mt-3 mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-control border border-warning bg-warning-soft px-3 py-2 text-sm"

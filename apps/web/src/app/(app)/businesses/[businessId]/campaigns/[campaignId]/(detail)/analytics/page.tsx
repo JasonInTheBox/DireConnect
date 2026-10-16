@@ -20,7 +20,8 @@ import {
 import { skippedReasons } from "@/lib/campaignDisplay";
 import type { CampaignAnalyticsResponse } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
-import { shouldAutoRefresh, useAutoRefresh } from "@/lib/useAutoRefresh";
+import { AUTO_REFRESH_MS, shouldAutoRefresh, useAutoRefresh } from "@/lib/useAutoRefresh";
+import { useManualRefresh, useReloadFailed } from "@/lib/useRefreshState";
 
 export default function CampaignResultsPage() {
   const { businessId, campaignId } = useParams<{ businessId: string; campaignId: string }>();
@@ -31,20 +32,34 @@ export default function CampaignResultsPage() {
     isDraft ? null : `/api/businesses/${businessId}/campaigns/${campaignId}/analytics`,
   );
 
-  const refreshing = loading || campaignRefreshing;
+  const busy = loading || campaignRefreshing;
+  const { manual, start } = useManualRefresh(busy);
+  const reloadFailed = useReloadFailed(error !== null, loading);
 
   function refresh() {
     refetch();
     refetchCampaign();
   }
 
+  // Only a click is announced; background reloads stay silent.
+  function refreshByUser() {
+    start();
+    refresh();
+  }
+
   // Hooks run before any early return. A tick is skipped while a reload is still running, so
-  // slow responses never stack or cancel each other.
-  useAutoRefresh(shouldAutoRefresh({ status: campaign.status, visible: true }), () => {
-    if (!refreshing) {
-      refresh();
-    }
-  });
+  // slow responses never stack or cancel each other. When the campaign leaves the queue, read this
+  // tab's data once more so the numbers match the new status.
+  useAutoRefresh(
+    shouldAutoRefresh({ status: campaign.status, visible: true }),
+    () => {
+      if (!busy) {
+        refresh();
+      }
+    },
+    AUTO_REFRESH_MS,
+    refetch,
+  );
 
   if (isDraft) {
     const canSend = headerActionsFor(campaign).send;
@@ -96,7 +111,7 @@ export default function CampaignResultsPage() {
         ) : null}
       </div>
 
-      <RefreshBar refreshing={refreshing} failed={error !== null} onRefresh={refresh} />
+      <RefreshBar refreshing={manual} failed={reloadFailed} earlier="numbers" onRefresh={refreshByUser} />
 
       <DeliveryPanel
         messages={{

@@ -6,34 +6,16 @@ import { AuthCard } from "@/components/auth/auth-card";
 import { buttonClasses, Button } from "@/components/ui/button";
 import { TextField } from "@/components/ui/field";
 import { FormError } from "@/components/ui/state";
-import { validateResetEmail } from "@/lib/account";
+import {
+  isRecoverNetworkFailure,
+  isRecoverNeutralFailure,
+  isRecoverRateLimited,
+  validateResetEmail,
+} from "@/lib/account";
 import { supabase } from "@/lib/supabase";
 
 const SUBTITLE = "Enter your email and we’ll send you a link to choose a new password.";
 const NETWORK_ERROR = "Could not send the email. Check your connection and try again.";
-
-/**
- * Supabase answers a repeat request for an EXISTING account within the cooldown with a 429 saying
- * "you can only request this after N seconds". Unknown addresses never get it, so showing it would
- * reveal which addresses are registered: it must look exactly like success.
- */
-function isCooldownRefusal(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    (error as { status?: unknown }).status === 429 &&
-    /only request this after/i.test(String((error as { message?: unknown }).message ?? ""))
-  );
-}
-
-/** Any other 429 (for example a global or per-IP limit) says nothing about the account. */
-function isRateLimit(error: unknown): boolean {
-  return typeof error === "object" && error !== null && (error as { status?: unknown }).status === 429;
-}
-
-function isNetworkFailure(error: unknown): boolean {
-  return typeof error === "object" && error !== null && (error as { name?: unknown }).name === "AuthRetryableFetchError";
-}
 
 export default function ForgotPasswordPage() {
   const formRef = useRef<HTMLFormElement>(null);
@@ -76,20 +58,31 @@ export default function ForgotPasswordPage() {
       const { error } = await supabase.auth.resetPasswordForEmail(address, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
-      if (!isCooldownRefusal(error) && isRateLimit(error)) {
-        // Never the raw Supabase message.
-        setFormError("Too many requests. Wait a few minutes and try again.");
-        return;
+      // Registered and unregistered addresses must look identical. Supabase answers an unknown
+      // address with a silent 200, so any failure that only happens when an email would really be
+      // sent (a server or SMTP error, the email limit, the per-address cooldown) is shown exactly like
+      // success (see isRecoverNeutralFailure). Only a request that never got a reply, or a rate limit
+      // that says nothing about the address, is reported. An unsent email for a real account is
+      // therefore invisible here: watch the Supabase auth logs and configure custom SMTP.
+      if (error && !isRecoverNeutralFailure(error)) {
+        if (isRecoverNetworkFailure(error)) {
+          setFormError(NETWORK_ERROR);
+          return;
+        }
+        if (isRecoverRateLimited(error)) {
+          // Never the raw Supabase message.
+          setFormError("Too many requests. Wait a few minutes and try again.");
+          return;
+        }
       }
-      if (isNetworkFailure(error)) {
-        setFormError(NETWORK_ERROR);
-        return;
-      }
-      // Success, "no such account", the per-account cooldown and any other answer all look the same:
-      // never reveal who has an account.
       setSentTo(address);
-    } catch {
-      setFormError(NETWORK_ERROR);
+    } catch (thrown) {
+      // auth-js throws every HTTP 5xx; those are neutral too. Anything else never got a reply.
+      if (isRecoverNeutralFailure(thrown)) {
+        setSentTo(address);
+      } else {
+        setFormError(NETWORK_ERROR);
+      }
     } finally {
       setSubmitting(false);
     }

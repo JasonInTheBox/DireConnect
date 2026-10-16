@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   authErrorMessage,
+  isRecoverNetworkFailure,
+  isRecoverNeutralFailure,
+  isRecoverRateLimited,
   isWrongPassword,
   passwordErrorTarget,
   validateNewPassword,
@@ -82,6 +85,61 @@ describe("authErrorMessage", () => {
     expect(authErrorMessage(new Error(""), "Fallback")).toBe("Fallback");
     expect(authErrorMessage("weird", "Fallback")).toBe("Fallback");
     expect(authErrorMessage(null, "Fallback")).toBe("Fallback");
+  });
+
+  it("explains a request that never got a reply instead of showing the browser's text", () => {
+    const unreachable = Object.assign(new Error("Failed to fetch"), {
+      name: "AuthRetryableFetchError",
+      status: 0,
+    });
+    expect(authErrorMessage(unreachable, "Fallback")).toBe(
+      "Could not reach the server. Check your connection and try again.",
+    );
+    const serverError = Object.assign(new Error("Database error"), { status: 500 });
+    expect(authErrorMessage(serverError, "Fallback")).toBe("Database error");
+  });
+});
+
+const cooldown = {
+  status: 429,
+  code: "over_email_send_rate_limit",
+  message: "For security purposes, you can only request this after 52 seconds.",
+};
+
+describe("password recovery error classes", () => {
+  it("treats only a request that never got a reply as a network failure", () => {
+    expect(isRecoverNetworkFailure({ status: 0, name: "AuthRetryableFetchError" })).toBe(true);
+    expect(isRecoverNetworkFailure({ status: 500, name: "AuthRetryableFetchError" })).toBe(false);
+    expect(isRecoverNetworkFailure({ status: 502 })).toBe(false);
+    expect(isRecoverNetworkFailure({ status: 429, code: "over_request_rate_limit" })).toBe(false);
+    expect(isRecoverNetworkFailure({ status: 400 })).toBe(false);
+    expect(isRecoverNetworkFailure(null)).toBe(false);
+  });
+
+  it("treats server failures and email limits as neutral, because only real accounts cause them", () => {
+    expect(isRecoverNeutralFailure({ status: 500 })).toBe(true);
+    expect(isRecoverNeutralFailure({ status: 502 })).toBe(true);
+    expect(isRecoverNeutralFailure({ status: 503 })).toBe(true);
+    // auth-js throws every HTTP 5xx as a retryable fetch error that still carries the status.
+    expect(isRecoverNeutralFailure({ name: "AuthRetryableFetchError", status: 500 })).toBe(true);
+    expect(isRecoverNeutralFailure({ status: 429, code: "over_email_send_rate_limit", message: "Email rate limit exceeded" })).toBe(true);
+    expect(isRecoverNeutralFailure(cooldown)).toBe(true);
+    expect(isRecoverNeutralFailure({ status: 429, message: "For security purposes, you can only request this after 5 seconds." })).toBe(true);
+    expect(isRecoverNeutralFailure({ status: 0, name: "AuthRetryableFetchError" })).toBe(false);
+    expect(isRecoverNeutralFailure({ status: 429, code: "over_request_rate_limit" })).toBe(false);
+    expect(isRecoverNeutralFailure({ status: 400 })).toBe(false);
+    expect(isRecoverNeutralFailure(null)).toBe(false);
+  });
+
+  it("calls a 429 a rate limit only when it says nothing about the account", () => {
+    expect(isRecoverRateLimited({ status: 429, code: "over_request_rate_limit", message: "Too many requests" })).toBe(true);
+    expect(isRecoverRateLimited({ status: 429, message: "Slow down" })).toBe(true);
+    expect(isRecoverRateLimited({ status: 429, code: "over_email_send_rate_limit" })).toBe(false);
+    expect(isRecoverRateLimited(cooldown)).toBe(false);
+    expect(isRecoverRateLimited({ status: 500 })).toBe(false);
+    expect(isRecoverRateLimited({ status: 0 })).toBe(false);
+    expect(isRecoverRateLimited({ status: 400 })).toBe(false);
+    expect(isRecoverRateLimited(null)).toBe(false);
   });
 });
 

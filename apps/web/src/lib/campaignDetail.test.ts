@@ -141,10 +141,10 @@ describe("failureHeadline", () => {
   it("names the most common failure reason", () => {
     expect(
       failureHeadline({ "Mailbox does not exist": 3, "Daily limit reached for this account": 1 }),
-    ).toBe("Most messages failed because: Mailbox does not exist (3 of 4).");
+    ).toBe("Most common failure reason: Mailbox does not exist (3 of 4 failed messages).");
   });
 
-  it("is plain when there is a single reason", () => {
+  it("is plain when there is exactly one reason", () => {
     expect(failureHeadline({ "Daily limit reached for this account": 2 })).toBe(
       "Messages failed because: Daily limit reached for this account (2 of 2).",
     );

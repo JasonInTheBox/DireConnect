@@ -127,6 +127,8 @@ export function failureHeadline(failedByReason: Record<string, number>): string 
   }
   const total = reasons.reduce((sum, reason) => sum + reason.count, 0);
   const top = reasons[0];
-  const lead = reasons.length === 1 ? "Messages failed because:" : "Most messages failed because:";
-  return `${lead} ${top.label} (${top.count} of ${total}).`;
+  if (reasons.length === 1) {
+    return `Messages failed because: ${top.label} (${top.count} of ${total}).`;
+  }
+  return `Most common failure reason: ${top.label} (${top.count} of ${total} failed messages).`;
 }

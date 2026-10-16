@@ -102,39 +102,60 @@ test("an answer other than success or a rate limit still shows the neutral confi
   await expect(page.getByText("Unable to validate email address")).toHaveCount(0);
 });
 
-test("a per-account cooldown refusal looks exactly like success", async ({ page }) => {
-  // GoTrue only sends this to addresses that have an account, so showing it would reveal them.
-  await mockApi(page, { businesses: [bakery] });
+type Recover = NonNullable<NonNullable<Parameters<typeof mockApi>[1]["authErrors"]>["recover"]>;
+
+/** Requests a reset for ada@example.com against a mock that answers as given; returns what the page says. */
+async function resetOutcome(page: Page, recover?: Recover) {
+  const state = await mockApi(page, { businesses: [bakery], authErrors: recover ? { recover } : undefined });
   await page.goto("/forgot-password");
   await page.getByRole("textbox", { name: "Email", exact: true }).fill("ada@example.com");
   await page.getByRole("button", { name: "Send reset link" }).click();
   const confirmation = page.getByText(/^If an account exists for/);
-  await expect(confirmation).toBeVisible();
-  const afterSuccess = await confirmation.innerText();
+  const sent = await confirmation.waitFor({ timeout: 5_000 }).then(
+    () => true,
+    () => false,
+  );
+  return { state, sent, text: sent ? await confirmation.innerText() : null };
+}
 
-  const state = await mockApi(page, {
-    businesses: [bakery],
-    authErrors: {
-      recover: {
+test.describe("failures that only a registered address can cause look exactly like success", () => {
+  // Supabase answers an unknown address with a silent 200 before sending, so none of these may be shown.
+  const cases: Array<[string, Recover]> = [
+    [
+      "the per-address cooldown",
+      {
         status: 429,
         code: "over_email_send_rate_limit",
         message: "For security purposes, you can only request this after 52 seconds.",
       },
-    },
-  });
-  await page.goto("/forgot-password");
-  await page.getByRole("textbox", { name: "Email", exact: true }).fill("ada@example.com");
-  await page.getByRole("button", { name: "Send reset link" }).click();
+    ],
+    ["the project-wide email limit", "Email rate limit exceeded"],
+    ["an SMTP or server error (500)", { status: 500, code: "unexpected_failure", message: "Error sending recovery email" }],
+    ["a bad gateway (502)", { status: 502, code: "unexpected_failure", message: "Bad gateway" }],
+  ];
 
-  await expect(confirmation).toBeVisible();
-  expect(await confirmation.innerText()).toBe(afterSuccess);
-  await expect(page.getByText("only request this after")).toHaveCount(0);
-  await expect(page.getByRole("textbox", { name: "Email", exact: true })).toHaveCount(0);
-  expect(state.authRequests.filter((request) => request.path === "/auth/v1/recover")).toHaveLength(1);
+  for (const [name, recover] of cases) {
+    test(name, async ({ page }) => {
+      const success = await resetOutcome(page);
+      expect(success.sent).toBe(true);
+
+      const outcome = await resetOutcome(page, recover);
+      expect(outcome.sent).toBe(true);
+      expect(outcome.text).toBe(success.text);
+      await expect(page.getByRole("textbox", { name: "Email", exact: true })).toHaveCount(0);
+      await expect(page.getByRole("alert").filter({ hasText: /\w/ })).toHaveCount(0);
+      expect(outcome.state.authRequests.filter((request) => request.path === "/auth/v1/recover")).toHaveLength(1);
+    });
+  }
 });
 
-test("any other rate limit shows generic copy, never Supabase's message, and keeps the form", async ({ page }) => {
-  await mockApi(page, { businesses: [bakery], authErrors: { recover: "Email rate limit exceeded" } });
+test("a rate limit that says nothing about the address shows generic copy and keeps the form", async ({ page }) => {
+  await mockApi(page, {
+    businesses: [bakery],
+    authErrors: {
+      recover: { status: 429, code: "over_request_rate_limit", message: "Request rate limit reached" },
+    },
+  });
   await page.goto("/forgot-password");
 
   await page.getByRole("textbox", { name: "Email", exact: true }).fill("ada@example.com");
@@ -143,7 +164,7 @@ test("any other rate limit shows generic copy, never Supabase's message, and kee
   await expect(
     page.getByRole("alert").filter({ hasText: "Too many requests. Wait a few minutes and try again." }),
   ).toBeVisible();
-  await expect(page.getByText("Email rate limit exceeded")).toHaveCount(0);
+  await expect(page.getByText("Request rate limit reached")).toHaveCount(0);
   await expect(page.getByRole("textbox", { name: "Email", exact: true })).toHaveValue("ada@example.com");
   await expect(page.getByRole("button", { name: "Send reset link" })).toBeVisible();
   await expect(page.getByText(CONFIRMATION)).toHaveCount(0);
@@ -300,4 +321,22 @@ test("visiting the reset page again after a successful change shows the expired 
   await expect(page).toHaveURL(/\/reset-password$/);
   await expect(page.getByText("This reset link has expired or was already used.")).toBeVisible({ timeout: 5_000 });
   await expect(page.getByLabel("New password")).toHaveCount(0);
+});
+
+test("a reset that never reaches the server says so, not the browser's text", async ({ page }) => {
+  await mockApi(page, { businesses: [bakery] });
+  await page.route("https://example.supabase.co/auth/v1/user", (route) =>
+    route.request().method() === "PUT" ? route.abort("failed") : route.fallback(),
+  );
+  await page.goto(RECOVERY_LINK);
+
+  await page.getByRole("textbox", { name: "New password", exact: true }).fill("correct horse battery");
+  await page.getByRole("textbox", { name: "Repeat new password", exact: true }).fill("correct horse battery");
+  await page.getByRole("button", { name: "Change password" }).click();
+
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Could not reach the server. Check your connection and try again." }),
+  ).toBeVisible();
+  await expect(page.getByText("Failed to fetch")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/reset-password/);
 });

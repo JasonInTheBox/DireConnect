@@ -13,7 +13,8 @@ import { pluralize } from "@/lib/format";
 import { formatDateTime } from "@/lib/schedule";
 import type { MessageLog } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
-import { shouldAutoRefresh, useAutoRefresh } from "@/lib/useAutoRefresh";
+import { AUTO_REFRESH_MS, shouldAutoRefresh, useAutoRefresh } from "@/lib/useAutoRefresh";
+import { useManualRefresh, useReloadFailed } from "@/lib/useRefreshState";
 
 function LogStatus({ status }: { status: MessageLog["status"] }) {
   const meta = logStatusMeta(status);
@@ -34,20 +35,34 @@ export default function CampaignDeliveryLogPage() {
   const { data, error, loading, slow, refetch } = useApi<MessageLog[]>(
     `/api/businesses/${businessId}/campaigns/${campaignId}/logs`,
   );
-  const refreshing = loading || campaignRefreshing;
+  const busy = loading || campaignRefreshing;
+  const { manual, start } = useManualRefresh(busy);
+  const reloadFailed = useReloadFailed(error !== null, loading);
 
   function refresh() {
     refetch();
     refetchCampaign();
   }
 
+  // Only a click is announced; background reloads stay silent.
+  function refreshByUser() {
+    start();
+    refresh();
+  }
+
   // Hooks run before any early return. A tick is skipped while a reload is still running, so
-  // slow responses never stack or cancel each other.
-  useAutoRefresh(shouldAutoRefresh({ status: campaign.status, visible: true }), () => {
-    if (!refreshing) {
-      refresh();
-    }
-  });
+  // slow responses never stack or cancel each other. When the campaign leaves the queue, read this
+  // tab's data once more so the numbers match the new status.
+  useAutoRefresh(
+    shouldAutoRefresh({ status: campaign.status, visible: true }),
+    () => {
+      if (!busy) {
+        refresh();
+      }
+    },
+    AUTO_REFRESH_MS,
+    refetch,
+  );
 
   if (data === null && error === null) {
     return <ListSkeleton rows={3} slow={slow} />;
@@ -63,7 +78,7 @@ export default function CampaignDeliveryLogPage() {
 
   return (
     <div className="space-y-4">
-      <RefreshBar refreshing={refreshing} failed={error !== null} onRefresh={refresh} />
+      <RefreshBar refreshing={manual} failed={reloadFailed} earlier="list" onRefresh={refreshByUser} />
 
       <Panel id="log-limits-heading" title="Why a message can fail">
         <p className="mt-2 text-sm text-muted">

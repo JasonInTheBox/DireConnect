@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Route } from "@playwright/test";
 import { business, campaign, customer, log, mockApi, signIn } from "./helpers/app";
 
 const bakery = business("b1", "Corner Bakery");
@@ -312,7 +312,8 @@ test.describe("campaign detail: Audience and Results", () => {
     await page.getByRole("button", { name: "Refresh" }).click();
     await expect(page.getByRole("region", { name: "Campaign summary" })).toContainText("Sent");
     await expect(page.getByText(/queued and waiting to be sent/)).toHaveCount(0);
-    await expect.poll(analyticsGets).toBe(2);
+    // The Refresh itself, plus one more read once the status change stops the polling.
+    await expect.poll(analyticsGets).toBe(3);
     await expect(page.getByRole("region", { name: "Delivery", exact: true })).not.toContainText("Pending3");
   });
 
@@ -557,20 +558,163 @@ test.describe("campaign detail: auto-refresh and failed campaigns", () => {
     const initial = analyticsGets();
     expect(initial).toBe(1);
 
+    // Make the first tick observable on screen (the numbers and the header both change), so the
+    // test knows it has been fully applied before it changes anything else.
+    analytics["k-3"] = { eligibleCount: 3, pendingCount: 2, sentCount: 1 };
+    state.campaigns.b1[0].title = "Weekend offer (tick 1)";
     await page.clock.runFor(16_000);
-    await expect.poll(analyticsGets).toBeGreaterThan(initial);
+    await expect(page.getByRole("heading", { level: 1, name: "Weekend offer (tick 1)" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Delivery", exact: true })).toContainText("Pending2");
+    expect(analyticsGets()).toBe(initial + 1);
 
     // The worker finishes; the next tick picks up the new status and the polling stops.
     state.campaigns.b1[0].status = "SENT";
     analytics["k-3"] = { eligibleCount: 3, sentCount: 3 };
     await page.clock.runFor(16_000);
     await expect(page.getByRole("region", { name: "Campaign summary" })).toContainText("Sent");
-    await expect(page.getByRole("region", { name: "Delivery", exact: true })).not.toContainText("Pending3");
+    await expect(page.getByRole("region", { name: "Delivery", exact: true })).not.toContainText(/Pending[1-9]/);
 
+    // One request for that tick plus one more when the polling stopped (see the next test).
+    await expect.poll(analyticsGets).toBe(initial + 3);
+    await page.waitForTimeout(300);
     const settled = analyticsGets();
     await page.clock.runFor(60_000);
     await page.waitForTimeout(300);
     expect(analyticsGets()).toBe(settled);
+  });
+
+  test("when polling stops because the status changed, the numbers are read once more", async ({ page }) => {
+    const analytics: Record<string, { eligibleCount: number; pendingCount?: number; sentCount?: number }> = {
+      "k-3": { eligibleCount: 3, pendingCount: 3 },
+    };
+    await page.clock.install();
+    const state = await mockApi(page, { businesses: [bakery], campaigns: { b1: [queued] }, analytics });
+    // The worker finishes between the tick's two reads: the campaign list already says SENT, but the
+    // analytics read of that same tick still reports pending. Only the follow-up read has the final numbers.
+    let gets = 0;
+    await page.route("**/api/businesses/b1/campaigns/k-3/analytics", async (route) => {
+      gets += 1;
+      if (gets === 3) {
+        analytics["k-3"] = { eligibleCount: 3, sentCount: 3 };
+      }
+      await route.fallback();
+    });
+    await page.goto("/businesses/b1/campaigns/k-3/analytics");
+    await expect(page.getByRole("region", { name: "Delivery", exact: true })).toContainText("Pending3");
+
+    state.campaigns.b1[0].status = "SENT";
+    await page.clock.runFor(16_000);
+
+    await expect(page.getByRole("region", { name: "Campaign summary" })).toContainText("Sent");
+    await expect(page.getByRole("region", { name: "Delivery", exact: true })).not.toContainText(/Pending[1-9]/);
+    await expect(page.getByRole("region", { name: "Delivery", exact: true })).toContainText("Sent3");
+    expect(gets).toBe(3);
+  });
+
+  test("a background refresh is silent: no Refreshing status and no busy button", async ({ page }) => {
+    await page.clock.install();
+    await mockApi(page, {
+      businesses: [bakery],
+      campaigns: { b1: [queued] },
+      analytics: { "k-3": { eligibleCount: 3, pendingCount: 3 } },
+    });
+    let gets = 0;
+    await page.route("**/api/businesses/b1/campaigns/k-3/analytics", async (route) => {
+      gets += 1;
+      if (gets === 2) {
+        await new Promise((resolve) => setTimeout(resolve, 800));
+      }
+      await route.fallback();
+    });
+    await page.goto("/businesses/b1/campaigns/k-3/analytics");
+    await expect(page.getByText(/queued and waiting to be sent/)).toBeVisible();
+
+    await page.evaluate(() => {
+      const w = window as unknown as { __announced: boolean };
+      w.__announced = false;
+      const check = () => {
+        if (document.body.innerText.includes("Refreshing…") || document.querySelector('[aria-busy="true"]')) {
+          w.__announced = true;
+        }
+      };
+      new MutationObserver(check).observe(document.body, {
+        subtree: true,
+        childList: true,
+        characterData: true,
+        attributes: true,
+      });
+    });
+
+    await page.clock.runFor(16_000);
+    // The tick's request is held for 800 ms; keep watching until it has finished.
+    await expect.poll(() => gets).toBe(2);
+    await page.waitForTimeout(1_500);
+    expect(await page.evaluate(() => (window as unknown as { __announced: boolean }).__announced)).toBe(false);
+    await expect(page.getByRole("button", { name: "Refresh" })).not.toHaveAttribute("aria-disabled", "true");
+
+    // A click is a refresh the user asked for, so that one is announced.
+    await page.getByRole("button", { name: "Refresh" }).click();
+    await expect(page.getByText("Refreshing…")).toBeVisible();
+    await expect(page.getByText("Refreshing…")).toHaveCount(0);
+  });
+
+  test("repeated failing background refreshes keep the same notices mounted", async ({ page }) => {
+    await page.clock.install();
+    await mockApi(page, {
+      businesses: [bakery],
+      campaigns: { b1: [queued] },
+      analytics: { "k-3": { eligibleCount: 3, pendingCount: 3 } },
+    });
+    const fail = (route: Route) =>
+      route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        headers: { "access-control-allow-origin": "*" },
+        body: JSON.stringify({ error: "Unavailable" }),
+      });
+    let analyticsGets = 0;
+    let listGets = 0;
+    await page.route("**/api/businesses/b1/campaigns/k-3/analytics", async (route) => {
+      analyticsGets += 1;
+      if (analyticsGets > 1) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        return fail(route);
+      }
+      return route.fallback();
+    });
+    await page.route("**/api/businesses/b1/campaigns", async (route) => {
+      if (route.request().method() !== "GET") {
+        return route.fallback();
+      }
+      listGets += 1;
+      if (listGets > 1) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        return fail(route);
+      }
+      return route.fallback();
+    });
+    await page.goto("/businesses/b1/campaigns/k-3/analytics");
+    await expect(page.getByText(/queued and waiting to be sent/)).toBeVisible();
+
+    const results = page.getByRole("alert").filter({ hasText: "Couldn’t refresh. Showing the earlier numbers." });
+    const header = page.getByRole("alert").filter({ hasText: "Couldn’t refresh the campaign." });
+
+    await page.clock.runFor(16_000);
+    await expect(results).toBeVisible();
+    await expect(header).toBeVisible();
+    await results.evaluate((element) => element.setAttribute("data-same-element", "yes"));
+    await header.evaluate((element) => element.setAttribute("data-same-element", "yes"));
+
+    // Two more failing ticks: the notices must stay the very same elements, so a screen reader hears
+    // them once, not on every attempt.
+    for (const tick of [2, 3]) {
+      await page.clock.runFor(16_000);
+      await expect.poll(() => analyticsGets).toBe(tick + 1);
+      await expect.poll(() => listGets).toBe(tick + 1);
+      await page.waitForTimeout(700);
+      await expect(results).toHaveAttribute("data-same-element", "yes");
+      await expect(header).toHaveAttribute("data-same-element", "yes");
+    }
   });
 
   test("a sent campaign is never refreshed on a timer", async ({ page }) => {
@@ -610,8 +754,9 @@ test.describe("campaign detail: auto-refresh and failed campaigns", () => {
     await expect(page.getByText(/queued and waiting to be sent/)).toBeVisible();
 
     await page.clock.runFor(16_000);
-    await expect(page.getByText("Refreshing…")).toBeVisible();
-    // The next ticks arrive while the second request is still running; they are skipped.
+    await expect.poll(() => gets).toBe(2);
+    // The next ticks arrive while the second request is still running; they are skipped. A
+    // background refresh is silent, so the second request itself shows that the tick ran.
     await page.clock.runFor(20_000);
     await expect(page.getByText("Refreshing…")).toHaveCount(0);
     // Counted at the route, because a request that is cancelled mid-flight never reaches the mock.
@@ -644,7 +789,7 @@ test.describe("campaign detail: auto-refresh and failed campaigns", () => {
     await expect(page.getByRole("row", { name: /ada@example.com/ })).toBeVisible();
 
     await page.getByRole("button", { name: "Refresh" }).click();
-    const notice = page.getByRole("alert").filter({ hasText: "Couldn’t refresh. Showing the earlier numbers." });
+    const notice = page.getByRole("alert").filter({ hasText: "Couldn’t refresh. Showing the earlier list." });
     await expect(notice).toBeVisible();
     await expect(page.getByRole("row", { name: /ada@example.com/ })).toBeVisible();
 
@@ -710,7 +855,7 @@ test.describe("campaign detail: auto-refresh and failed campaigns", () => {
     await page.goto("/businesses/b1/campaigns/k-5/analytics");
 
     await expect(
-      page.getByText("Most messages failed because: Mailbox does not exist (3 of 4).", { exact: true }),
+      page.getByText("Most common failure reason: Mailbox does not exist (3 of 4 failed messages).", { exact: true }),
     ).toBeVisible();
     await expect(page.getByText("This campaign didn’t finish sending.", { exact: true })).toBeVisible();
   });

@@ -232,3 +232,19 @@ test.describe("account page", () => {
     expect(state.authRequests.some((request) => request.path === "/auth/v1/logout")).toBe(true);
   });
 });
+
+test("a password change that never reaches the server says so, not the browser's text", async ({ page }) => {
+  await signIn(page);
+  await mockApi(page, { businesses: [bakery] });
+  await page.route("https://example.supabase.co/auth/v1/user", (route) =>
+    route.request().method() === "PUT" ? route.abort("failed") : route.fallback(),
+  );
+  await page.goto("/account");
+
+  await fillPasswordForm(page, "old-password", "new-password-1");
+
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Could not reach the server. Check your connection and try again." }),
+  ).toBeVisible();
+  await expect(page.getByText("Failed to fetch")).toHaveCount(0);
+});
