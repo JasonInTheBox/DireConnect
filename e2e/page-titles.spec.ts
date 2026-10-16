@@ -41,6 +41,39 @@ test.describe("page titles", () => {
     await expect(page).toHaveTitle("Customers · DireConnect");
   });
 
+  test("a business that does not exist names the page", async ({ page }) => {
+    await signIn(page);
+    await mockApi(page, { businesses: [bakery] });
+    await page.goto("/businesses/does-not-exist/dashboard");
+
+    await expect(page.getByRole("heading", { name: "Business not found" })).toBeVisible();
+    await expect(page).toHaveTitle("Business not found · DireConnect");
+  });
+
+  test("a businesses request that is loading or failed keeps a title", async ({ page }) => {
+    await signIn(page);
+    await mockApi(page, { businesses: [bakery] });
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route("**/api/businesses", async (route) => {
+      await gate;
+      await route.fulfill({
+        status: 500,
+        headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "authorization,content-type" },
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Businesses unavailable" }),
+      });
+    });
+    await page.goto("/businesses/b1/dashboard");
+
+    await expect(page).toHaveTitle("DireConnect");
+    release();
+    await expect(page.getByText("Businesses unavailable")).toBeVisible();
+    await expect(page).toHaveTitle("DireConnect");
+  });
+
   test("the login and signup pages name themselves", async ({ page }) => {
     await page.goto("/login");
     await expect(page).toHaveTitle("Log in · DireConnect");
