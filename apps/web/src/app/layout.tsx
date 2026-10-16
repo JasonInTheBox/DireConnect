@@ -13,7 +13,6 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "DireConnect", template: "%s · DireConnect" },
   description:
     "Keep your customer list and send email campaigns to the people who asked to hear from you.",
 };

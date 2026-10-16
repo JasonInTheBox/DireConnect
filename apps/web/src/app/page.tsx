@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { buttonClasses } from "@/components/ui/button";
+import { pageTitle } from "@/lib/pageTitle";
 import { supabase } from "@/lib/supabase";
 import { useApiWarmup } from "@/lib/useApiWarmup";
 
@@ -11,6 +12,11 @@ export default function Home() {
   const router = useRouter();
 
   useApiWarmup();
+
+  // No route metadata title exists (pages name themselves), so the landing page sets the plain product name.
+  useEffect(() => {
+    document.title = pageTitle("");
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {

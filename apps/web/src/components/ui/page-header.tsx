@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { pageTitle } from "@/lib/pageTitle";
 import { Icon } from "./icons";
 
 export type Crumb = { label: string; href?: string };
@@ -39,6 +42,11 @@ export function PageHeader({
   breadcrumbs?: Crumb[];
   actions?: ReactNode;
 }) {
+  // Client pages cannot export metadata, so each page names itself (WCAG 2.4.2).
+  useEffect(() => {
+    document.title = pageTitle(title);
+  }, [title]);
+
   return (
     <header className="mb-6 space-y-3">
       {breadcrumbs ? <Breadcrumbs items={breadcrumbs} /> : null}

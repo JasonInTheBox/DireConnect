@@ -43,14 +43,25 @@ export function Button({
   className,
   children,
   type = "button",
+  onClick,
   ...rest
 }: ButtonProps) {
   return (
     <button
       type={type}
-      disabled={disabled || loading}
+      disabled={disabled}
+      // `aria-disabled` instead of `disabled` while loading keeps keyboard focus on the button.
+      aria-disabled={loading || undefined}
       aria-busy={loading || undefined}
-      className={buttonClasses({ variant, size, className })}
+      onClick={(event) => {
+        if (loading) {
+          // Blocks the click, a form submit from this button and implicit submission via Enter.
+          event.preventDefault();
+          return;
+        }
+        onClick?.(event);
+      }}
+      className={buttonClasses({ variant, size, className: cn(loading && "opacity-50", className) })}
       {...rest}
     >
       {loading ? <Spinner /> : null}
