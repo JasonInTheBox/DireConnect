@@ -1,6 +1,4 @@
-"use client";
-
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { pageTitle } from "@/lib/pageTitle";
 
 export function AuthCard({
@@ -14,13 +12,10 @@ export function AuthCard({
   children: ReactNode;
   footer?: ReactNode;
 }) {
-  // Client pages cannot export metadata, so each page names itself (WCAG 2.4.2).
-  useEffect(() => {
-    document.title = pageTitle(title);
-  }, [title]);
-
   return (
     <div className="w-full max-w-sm">
+      {/* React hoists <title> into <head>, on the server too (WCAG 2.4.2). */}
+      <title>{pageTitle(title)}</title>
       <p className="mb-6 text-center text-sm font-semibold tracking-tight text-ink">DireConnect</p>
       <section className="rounded-container border border-line bg-surface p-6">
         <h1 className="text-xl font-semibold tracking-tight">{title}</h1>

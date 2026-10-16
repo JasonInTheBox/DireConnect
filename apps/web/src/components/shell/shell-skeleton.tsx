@@ -1,9 +1,11 @@
+import { pageTitle } from "@/lib/pageTitle";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /** Shown while the session is being confirmed, so the page does not flash. */
 export function ShellSkeleton() {
   return (
     <div role="status" className="min-h-screen lg:flex">
+      <title>{pageTitle("")}</title>
       <span className="sr-only">Loading</span>
       <aside className="hidden h-screen w-64 shrink-0 space-y-3 border-r border-line bg-surface p-3 lg:block">
         <Skeleton className="h-4 w-24" />

@@ -12,6 +12,7 @@ import { ListSkeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/state";
 import { LinkTabs } from "@/components/ui/tabs";
 import { DETAIL_TABS, detailHref } from "@/lib/campaignDetail";
+import { pageTitle } from "@/lib/pageTitle";
 import type { Campaign } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 
@@ -40,9 +41,13 @@ function CampaignDetailShell({
   const { data, error, loading, slow, refetch } = useApi<Campaign[]>(`/api/businesses/${businessId}/campaigns`);
   const campaign = data?.find((item) => item.id === campaignId) ?? null;
 
+  // Until the campaign loads there is no header to name the page.
+  const placeholderTitle = <title>{pageTitle("Campaign")}</title>;
+
   if (data === null && error === null) {
     return (
       <PageContainer>
+        {placeholderTitle}
         <ListSkeleton rows={4} slow={slow} />
       </PageContainer>
     );
@@ -50,6 +55,7 @@ function CampaignDetailShell({
   if (data === null && error) {
     return (
       <PageContainer>
+        {placeholderTitle}
         <ErrorState title="Couldn’t load the campaign" message={error.message} onRetry={refetch} />
       </PageContainer>
     );
@@ -57,6 +63,7 @@ function CampaignDetailShell({
   if (!campaign) {
     return (
       <PageContainer>
+        {placeholderTitle}
         <EmptyState
           title="Campaign not found"
           description="This campaign doesn’t exist or was deleted."

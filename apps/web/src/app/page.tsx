@@ -13,11 +13,6 @@ export default function Home() {
 
   useApiWarmup();
 
-  // No route metadata title exists (pages name themselves), so the landing page sets the plain product name.
-  useEffect(() => {
-    document.title = pageTitle("");
-  }, []);
-
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
@@ -28,6 +23,7 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-10">
+      <title>{pageTitle("")}</title>
       <div className="w-full max-w-lg text-center">
         <p className="text-sm font-semibold tracking-tight">DireConnect</p>
         <h1 className="mt-6 text-3xl font-semibold tracking-tight">

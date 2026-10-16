@@ -61,7 +61,7 @@ export function Button({
         }
         onClick?.(event);
       }}
-      className={buttonClasses({ variant, size, className: cn(loading && "opacity-50", className) })}
+      className={buttonClasses({ variant, size, className: cn(loading && "opacity-50 aria-disabled:cursor-default", className) })}
       {...rest}
     >
       {loading ? <Spinner /> : null}

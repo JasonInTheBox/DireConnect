@@ -49,6 +49,17 @@ test.describe("page titles", () => {
   });
 });
 
+test("the server-rendered HTML already carries one title", async ({ request }) => {
+  for (const [path, title] of [
+    ["/", "DireConnect"],
+    ["/login", "Log in · DireConnect"],
+    ["/signup", "Create account · DireConnect"],
+  ]) {
+    const html = await (await request.get(path)).text();
+    expect(html.match(/<title[^>]*>[^<]*<\/title>/g)).toEqual([`<title>${title}</title>`]);
+  }
+});
+
 test("a loading button keeps keyboard focus and ignores a second activation", async ({ page }) => {
   await signIn(page, { emailConfirmed: false });
   const state = await mockApi(page, { businesses: [bakery] });
