@@ -123,7 +123,7 @@ export async function signIn(page: Page, options: { emailConfirmed?: boolean } =
   }, emailConfirmed);
 }
 
-export type RecordedRequest = { method: string; path: string; body: unknown };
+export type RecordedRequest = { method: string; path: string; body: unknown; search?: string };
 
 export type MockRecentCampaign = {
   id: string;
@@ -211,8 +211,12 @@ type ApiMockOptions = {
   failAnalyticsFor?: string[];
   /** Makes every queue request fail with this status and message. */
   queueError?: { status: number; error: string };
-  /** Makes Supabase auth calls fail: `updateUser` answers 422 with this message. */
-  authErrors?: { updateUser?: string };
+  /**
+   * Makes Supabase auth calls fail: `updateUser` answers 422 with this message, `signIn` (the
+   * password grant used to check the current password) answers 400 invalid credentials, and
+   * `signOutOthers` makes `logout?scope=others` answer 500 with this message.
+   */
+  authErrors?: { updateUser?: string; signIn?: string; signOutOthers?: string };
   /** When true, a refreshed session reports the email as confirmed. */
   confirmedAfterRefresh?: boolean;
 };
@@ -356,6 +360,7 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
       method: request.method(),
       path: url.pathname,
       body: rawBody ? JSON.parse(rawBody) : undefined,
+      search: url.search,
     });
 
     const user = (confirmed: boolean) => ({
@@ -378,16 +383,32 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
       return json(200, {});
     }
     if (url.pathname === "/auth/v1/token" && request.method() === "POST") {
+      const passwordGrant = url.searchParams.get("grant_type") === "password";
+      if (passwordGrant && options.authErrors?.signIn) {
+        return json(400, {
+          code: 400,
+          error_code: "invalid_credentials",
+          msg: "Invalid login credentials",
+        });
+      }
       return json(200, {
         access_token: "test-access-token",
         refresh_token: "test-refresh-token",
         token_type: "bearer",
         expires_in: 86_400,
         expires_at: Math.floor(Date.now() / 1000) + 86_400,
-        user: user(Boolean(options.confirmedAfterRefresh)),
+        // A password sign-in only works for a confirmed user; a refresh follows the option.
+        user: user(passwordGrant || Boolean(options.confirmedAfterRefresh)),
       });
     }
     if (url.pathname === "/auth/v1/logout") {
+      if (url.searchParams.get("scope") === "others" && options.authErrors?.signOutOthers) {
+        return json(500, {
+          code: 500,
+          error_code: "unexpected_failure",
+          msg: options.authErrors.signOutOthers,
+        });
+      }
       return route.fulfill({ status: 204, headers: cors });
     }
     return json(404, {});

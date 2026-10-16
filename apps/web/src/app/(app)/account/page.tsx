@@ -11,7 +11,12 @@ import { PageContainer, PageHeader } from "@/components/ui/page-header";
 import { Panel } from "@/components/ui/panel";
 import { FormError } from "@/components/ui/state";
 import { useToast } from "@/components/ui/toast";
-import { authErrorMessage, passwordErrorTarget, validatePasswordForm } from "@/lib/account";
+import {
+  authErrorMessage,
+  isWrongPassword,
+  passwordErrorTarget,
+  validatePasswordForm,
+} from "@/lib/account";
 import { focusFirstInvalid } from "@/lib/forms";
 import { toSessionUser } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
@@ -127,9 +132,10 @@ function SignInPanel() {
 }
 
 function PasswordPanel() {
+  const user = useSession();
   const toast = useToast();
   const formRef = useRef<HTMLFormElement>(null);
-  const [values, setValues] = useState({ password: "", confirm: "" });
+  const [values, setValues] = useState({ current: "", password: "", confirm: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -164,6 +170,29 @@ function PasswordPanel() {
 
     setSaving(true);
     try {
+      // Supabase does not check the old password when it is changed, so prove it first.
+      if (!user.email) {
+        setFormError(
+          "We couldn’t check your current password. Log out and back in, then try again.",
+        );
+        return;
+      }
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: values.current,
+      });
+      if (verifyError) {
+        if (isWrongPassword(verifyError)) {
+          focusAfterRender.current = true;
+          setErrors({ current: "That isn’t your current password." });
+        } else {
+          setFormError(
+            authErrorMessage(verifyError, "Could not check your current password. Try again."),
+          );
+        }
+        return;
+      }
+
       const { error } = await supabase.auth.updateUser({ password: values.password });
       if (error) {
         const text = authErrorMessage(error, "Could not change the password. Try again.");
@@ -176,8 +205,22 @@ function PasswordPanel() {
         return;
       }
 
-      setValues({ password: "", confirm: "" });
-      toast.success("Password changed");
+      // The password is changed. Ending the other sessions is a bonus: if it fails, say so, but do
+      // not report the change as failed. The scope keeps this device signed in.
+      let othersFailed = false;
+      try {
+        const { error: othersError } = await supabase.auth.signOut({ scope: "others" });
+        othersFailed = Boolean(othersError);
+      } catch {
+        othersFailed = true;
+      }
+
+      setValues({ current: "", password: "", confirm: "" });
+      toast.success(
+        othersFailed
+          ? "Password changed. We couldn’t sign out your other devices; log out and back in there."
+          : "Password changed",
+      );
     } finally {
       setSaving(false);
     }
@@ -186,6 +229,15 @@ function PasswordPanel() {
   return (
     <Panel id="account-password-heading" title="Password">
       <form ref={formRef} onSubmit={handleSubmit} noValidate className="mt-3 max-w-sm space-y-4">
+        <TextField
+          label="Current password"
+          type="password"
+          autoComplete="current-password"
+          required
+          value={values.current}
+          onChange={(event) => setValues((previous) => ({ ...previous, current: event.target.value }))}
+          error={errors.current}
+        />
         <TextField
           label="New password"
           type="password"

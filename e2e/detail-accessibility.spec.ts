@@ -122,7 +122,9 @@ test.describe("campaign detail and account: keyboard and small screens", () => {
     );
     expect(overflow).toBeLessThanOrEqual(0);
 
-    await page.getByRole("textbox", { name: "New password", exact: true }).focus();
+    await page.getByRole("textbox", { name: "Current password", exact: true }).focus();
+    await page.keyboard.type("old-password");
+    await page.keyboard.press("Tab");
     await page.keyboard.type("a-better-password");
     await page.keyboard.press("Tab");
     await page.keyboard.type("a-better-password");
