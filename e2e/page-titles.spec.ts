@@ -80,6 +80,14 @@ test.describe("page titles", () => {
     await page.goto("/signup");
     await expect(page).toHaveTitle("Create account · DireConnect");
   });
+
+  test("the password recovery pages name themselves", async ({ page }) => {
+    await mockApi(page, { businesses: [bakery] });
+    await page.goto("/forgot-password");
+    await expect(page).toHaveTitle("Reset your password · DireConnect");
+    await page.goto("/reset-password");
+    await expect(page).toHaveTitle("Choose a new password · DireConnect");
+  });
 });
 
 test("the server-rendered HTML already carries one title", async ({ request }) => {
@@ -87,6 +95,8 @@ test("the server-rendered HTML already carries one title", async ({ request }) =
     ["/", "DireConnect"],
     ["/login", "Log in · DireConnect"],
     ["/signup", "Create account · DireConnect"],
+    ["/forgot-password", "Reset your password · DireConnect"],
+    ["/reset-password", "Choose a new password · DireConnect"],
   ]) {
     const html = await (await request.get(path)).text();
     expect(html.match(/<title[^>]*>[^<]*<\/title>/g)).toEqual([`<title>${title}</title>`]);

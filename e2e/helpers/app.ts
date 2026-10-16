@@ -215,12 +215,15 @@ type ApiMockOptions = {
    * Makes Supabase auth calls fail: `updateUser` answers 422 with this message, `signIn` (the
    * password grant used to check the current password) answers 400 invalid credentials, or the given
    * status, code and message, and
-   * `signOutOthers` makes `logout?scope=others` answer 500 with this message.
+   * `signOutOthers` makes `logout?scope=others` answer 500 with this message, and `recover` makes
+   * the password-reset email request answer 429.
    */
   authErrors?: {
     updateUser?: string;
     signIn?: string | { status: number; code: string; message: string };
     signOutOthers?: string;
+    /** Makes `POST /auth/v1/recover` answer 429 (rate limited) with this message. */
+    recover?: string;
   };
   /** When true, a refreshed session reports the email as confirmed. */
   confirmedAfterRefresh?: boolean;
@@ -383,6 +386,21 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
         return json(422, { code: 422, error_code: "weak_password", msg: options.authErrors.updateUser });
       }
       return json(200, user(true));
+    }
+    // supabase-js calls this to validate the access token in an emailed recovery link.
+    if (url.pathname === "/auth/v1/user" && request.method() === "GET") {
+      return json(200, user(true));
+    }
+    if (url.pathname === "/auth/v1/recover" && request.method() === "POST") {
+      if (options.authErrors?.recover) {
+        return json(429, {
+          code: 429,
+          error_code: "over_email_send_rate_limit",
+          msg: options.authErrors.recover,
+        });
+      }
+      // Always 200, whether or not the address has an account, like Supabase.
+      return json(200, {});
     }
     if (url.pathname === "/auth/v1/resend" && request.method() === "POST") {
       return json(200, {});

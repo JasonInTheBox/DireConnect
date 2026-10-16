@@ -3,7 +3,9 @@ import {
   authErrorMessage,
   isWrongPassword,
   passwordErrorTarget,
+  validateNewPassword,
   validatePasswordForm,
+  validateResetEmail,
 } from "./account";
 
 describe("validatePasswordForm", () => {
@@ -80,5 +82,38 @@ describe("authErrorMessage", () => {
     expect(authErrorMessage(new Error(""), "Fallback")).toBe("Fallback");
     expect(authErrorMessage("weird", "Fallback")).toBe("Fallback");
     expect(authErrorMessage(null, "Fallback")).toBe("Fallback");
+  });
+});
+
+describe("validateResetEmail", () => {
+  it("accepts an email-looking value and trims it", () => {
+    expect(validateResetEmail(" ada@example.com ")).toEqual({});
+  });
+
+  it("asks for an email, and for a valid one", () => {
+    expect(validateResetEmail("")).toEqual({ email: "Enter your email address." });
+    expect(validateResetEmail("   ")).toEqual({ email: "Enter your email address." });
+    expect(validateResetEmail("not-an-email")).toEqual({ email: "Enter a valid email address." });
+  });
+});
+
+describe("validateNewPassword", () => {
+  it("accepts a matching, non-empty pair", () => {
+    expect(validateNewPassword("correct horse", "correct horse")).toEqual({});
+  });
+
+  it("asks for a password and for the repeat", () => {
+    expect(validateNewPassword("", "")).toEqual({
+      password: "Enter a new password.",
+      confirm: "Repeat the new password.",
+    });
+  });
+
+  it("refuses a mismatch", () => {
+    expect(validateNewPassword("one", "two")).toEqual({ confirm: "The passwords don’t match." });
+  });
+
+  it("asks for the repeat when only the password is filled in", () => {
+    expect(validateNewPassword("one", "")).toEqual({ confirm: "Repeat the new password." });
   });
 });

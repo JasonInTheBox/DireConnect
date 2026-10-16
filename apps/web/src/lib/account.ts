@@ -19,6 +19,28 @@ export function validatePasswordForm(values: PasswordFormValues): Record<string,
   return errors;
 }
 
+/** The new-password form on the reset page: no current password, because the emailed link proves access. */
+export function validateNewPassword(password: string, confirm: string): Record<string, string> {
+  const errors: Record<string, string> = {};
+  if (!password) {
+    errors.password = "Enter a new password.";
+  }
+  if (!confirm) {
+    errors.confirm = "Repeat the new password.";
+  } else if (password && confirm !== password) {
+    errors.confirm = "The passwords don’t match.";
+  }
+  return errors;
+}
+
+export function validateResetEmail(email: string): Record<string, string> {
+  const value = email.trim();
+  if (!value) {
+    return { email: "Enter your email address." };
+  }
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? {} : { email: "Enter a valid email address." };
+}
+
 /**
  * True when Supabase refused the sign-in because the password is wrong. Other refusals (captcha,
  * unconfirmed email, rate limits) and network failures are not a wrong password and must not be

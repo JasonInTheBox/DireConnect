@@ -91,6 +91,12 @@ export default function LoginPage() {
           onChange={(event) => setPassword(event.target.value)}
           error={errors.password}
         />
+        <Link
+          href="/forgot-password"
+          className="inline-flex min-h-10 items-center text-sm font-medium text-accent hover:underline"
+        >
+          Forgot password?
+        </Link>
 
         {formError ? <FormError message={formError} /> : null}
 
