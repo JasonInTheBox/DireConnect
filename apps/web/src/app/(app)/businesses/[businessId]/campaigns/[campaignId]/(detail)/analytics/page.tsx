@@ -43,8 +43,10 @@ export default function CampaignResultsPage() {
 
   // Only a click is announced; background reloads stay silent.
   function refreshByUser() {
-    start();
-    refresh();
+    // Ignored while a refresh the user started is still running.
+    if (start()) {
+      refresh();
+    }
   }
 
   // Hooks run before any early return. A tick is skipped while a reload is still running, so

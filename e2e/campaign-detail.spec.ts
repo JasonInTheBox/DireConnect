@@ -1,4 +1,4 @@
-import { expect, test, type Route } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 import { business, campaign, customer, log, mockApi, signIn } from "./helpers/app";
 
 const bakery = business("b1", "Corner Bakery");
@@ -621,7 +621,7 @@ test.describe("campaign detail: auto-refresh and failed campaigns", () => {
     let gets = 0;
     await page.route("**/api/businesses/b1/campaigns/k-3/analytics", async (route) => {
       gets += 1;
-      if (gets === 2) {
+      if (gets === 2 || gets === 3) {
         await new Promise((resolve) => setTimeout(resolve, 800));
       }
       await route.fallback();
@@ -652,7 +652,8 @@ test.describe("campaign detail: auto-refresh and failed campaigns", () => {
     expect(await page.evaluate(() => (window as unknown as { __announced: boolean }).__announced)).toBe(false);
     await expect(page.getByRole("button", { name: "Refresh" })).not.toHaveAttribute("aria-disabled", "true");
 
-    // A click is a refresh the user asked for, so that one is announced.
+    // A click is a refresh the user asked for, so that one is announced. Its response is held for
+    // 800 ms (see the route above), so the status is on screen long enough to be asserted.
     await page.getByRole("button", { name: "Refresh" }).click();
     await expect(page.getByText("Refreshing…")).toBeVisible();
     await expect(page.getByText("Refreshing…")).toHaveCount(0);
@@ -715,6 +716,123 @@ test.describe("campaign detail: auto-refresh and failed campaigns", () => {
       await expect(results).toHaveAttribute("data-same-element", "yes");
       await expect(header).toHaveAttribute("data-same-element", "yes");
     }
+  });
+
+  // The first Refresh fails (so the failure notice with Try again is on screen); the next request is
+  // held until `release()` and then succeeds.
+  async function failedThenHeld(page: Page) {
+    await mockApi(page, {
+      businesses: [bakery],
+      campaigns: { b1: [queued] },
+      analytics: { "k-3": { eligibleCount: 3, pendingCount: 3 } },
+    });
+    let gets = 0;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route("**/api/businesses/b1/campaigns/k-3/analytics", async (route) => {
+      gets += 1;
+      if (gets === 2) {
+        return route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          headers: { "access-control-allow-origin": "*" },
+          body: JSON.stringify({ error: "Analytics unavailable" }),
+        });
+      }
+      if (gets === 3) {
+        await gate;
+      }
+      return route.fallback();
+    });
+    await page.goto("/businesses/b1/campaigns/k-3/analytics");
+    await expect(page.getByText(/queued and waiting to be sent/)).toBeVisible();
+    await page.getByRole("button", { name: "Refresh" }).click();
+    const notice = page.getByRole("alert").filter({ hasText: "Couldn’t refresh. Showing the earlier numbers." });
+    await expect(notice).toBeVisible();
+    return { notice, release: () => release(), gets: () => gets };
+  }
+
+  async function expectIdleAndRefreshable(page: Page, gets: () => number) {
+    const refresh = page.getByRole("button", { name: "Refresh" });
+    await expect(page.getByRole("status").filter({ hasText: "Refreshing…" })).toHaveCount(0);
+    await expect(refresh).not.toHaveAttribute("aria-disabled", "true");
+    await expect(refresh).not.toHaveAttribute("aria-busy", "true");
+    // Further clicks still send a request.
+    const before = gets();
+    await refresh.click();
+    await expect.poll(gets).toBeGreaterThan(before);
+  }
+
+  test("double-clicking Try again sends one request and leaves Refresh usable afterwards", async ({ page }) => {
+    const { notice, release, gets } = await failedThenHeld(page);
+
+    await notice.getByRole("button", { name: "Try again" }).dblclick();
+    await expect.poll(gets).toBe(3);
+    await page.waitForTimeout(300);
+    expect(gets()).toBe(3);
+    release();
+
+    await expect(notice).toHaveCount(0);
+    await expectIdleAndRefreshable(page, gets);
+  });
+
+  test("Try again while a Refresh is running is ignored and Refresh recovers afterwards", async ({ page }) => {
+    const { notice, release, gets } = await failedThenHeld(page);
+
+    await page.getByRole("button", { name: "Refresh" }).click();
+    await expect(page.getByText("Refreshing…")).toBeVisible();
+    await expect.poll(gets).toBe(3);
+    await notice.getByRole("button", { name: "Try again" }).click();
+    await page.waitForTimeout(300);
+    expect(gets()).toBe(3);
+    release();
+
+    await expect(notice).toHaveCount(0);
+    await expectIdleAndRefreshable(page, gets);
+  });
+
+  test("a successful retry after a failed first load never mounts the refresh notice", async ({ page }) => {
+    await mockApi(page, { businesses: [bakery], campaigns: { b1: [queued] } });
+    let lists = 0;
+    await page.route("**/api/businesses/b1/campaigns", async (route) => {
+      if (route.request().method() !== "GET") {
+        return route.fallback();
+      }
+      lists += 1;
+      if (lists === 1) {
+        return route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          headers: { "access-control-allow-origin": "*" },
+          body: JSON.stringify({ error: "List unavailable" }),
+        });
+      }
+      return route.fallback();
+    });
+    await page.goto("/businesses/b1/campaigns/k-3/analytics");
+    await expect(page.getByRole("heading", { name: "Couldn’t load the campaign" })).toBeVisible();
+
+    await page.evaluate(() => {
+      const w = window as unknown as { __noticeSeen: boolean };
+      w.__noticeSeen = false;
+      new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          mutation.addedNodes.forEach((node) => {
+            if (node instanceof Element && node.textContent?.includes("Couldn’t refresh")) {
+              w.__noticeSeen = true;
+            }
+          });
+        }
+      }).observe(document.body, { subtree: true, childList: true });
+    });
+    await page.getByRole("button", { name: "Try again" }).click();
+
+    await expect(page.getByRole("heading", { level: 1, name: "Weekend offer" })).toBeVisible();
+    await expect(page.getByText(/queued and waiting to be sent/)).toBeVisible();
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => (window as unknown as { __noticeSeen: boolean }).__noticeSeen)).toBe(false);
   });
 
   test("a sent campaign is never refreshed on a timer", async ({ page }) => {
