@@ -222,8 +222,11 @@ type ApiMockOptions = {
     updateUser?: string;
     signIn?: string | { status: number; code: string; message: string };
     signOutOthers?: string;
-    /** Makes `POST /auth/v1/recover` answer 429 (rate limited) with this message. */
-    recover?: string;
+    /**
+     * Makes `POST /auth/v1/recover` answer 429 (`over_email_send_rate_limit`) with this message, or
+     * the given status, code and message.
+     */
+    recover?: string | { status: number; code: string; message: string };
   };
   /** When true, a refreshed session reports the email as confirmed. */
   confirmedAfterRefresh?: boolean;
@@ -392,11 +395,16 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
       return json(200, user(true));
     }
     if (url.pathname === "/auth/v1/recover" && request.method() === "POST") {
-      if (options.authErrors?.recover) {
-        return json(429, {
-          code: 429,
-          error_code: "over_email_send_rate_limit",
-          msg: options.authErrors.recover,
+      const recoverError = options.authErrors?.recover;
+      if (recoverError) {
+        const refusal =
+          typeof recoverError === "string"
+            ? { status: 429, code: "over_email_send_rate_limit", message: recoverError }
+            : recoverError;
+        return json(refusal.status, {
+          code: refusal.status,
+          error_code: refusal.code,
+          msg: refusal.message,
         });
       }
       // Always 200, whether or not the address has an account, like Supabase.

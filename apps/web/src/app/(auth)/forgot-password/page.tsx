@@ -12,7 +12,21 @@ import { supabase } from "@/lib/supabase";
 const SUBTITLE = "Enter your email and we’ll send you a link to choose a new password.";
 const NETWORK_ERROR = "Could not send the email. Check your connection and try again.";
 
-/** A rate limit is the one refusal worth reporting; it says nothing about whether an account exists. */
+/**
+ * Supabase answers a repeat request for an EXISTING account within the cooldown with a 429 saying
+ * "you can only request this after N seconds". Unknown addresses never get it, so showing it would
+ * reveal which addresses are registered: it must look exactly like success.
+ */
+function isCooldownRefusal(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { status?: unknown }).status === 429 &&
+    /only request this after/i.test(String((error as { message?: unknown }).message ?? ""))
+  );
+}
+
+/** Any other 429 (for example a global or per-IP limit) says nothing about the account. */
 function isRateLimit(error: unknown): boolean {
   return typeof error === "object" && error !== null && (error as { status?: unknown }).status === 429;
 }
@@ -62,15 +76,17 @@ export default function ForgotPasswordPage() {
       const { error } = await supabase.auth.resetPasswordForEmail(address, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
-      if (isRateLimit(error)) {
-        setFormError(error instanceof Error && error.message ? error.message : "Too many requests. Wait a few minutes and try again.");
+      if (!isCooldownRefusal(error) && isRateLimit(error)) {
+        // Never the raw Supabase message.
+        setFormError("Too many requests. Wait a few minutes and try again.");
         return;
       }
       if (isNetworkFailure(error)) {
         setFormError(NETWORK_ERROR);
         return;
       }
-      // Any other answer, including "no such account", looks the same: never reveal who has an account.
+      // Success, "no such account", the per-account cooldown and any other answer all look the same:
+      // never reveal who has an account.
       setSentTo(address);
     } catch {
       setFormError(NETWORK_ERROR);
