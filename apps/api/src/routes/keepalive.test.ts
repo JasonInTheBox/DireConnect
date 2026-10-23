@@ -9,7 +9,7 @@ const SUPABASE_KEY = "sb_publishable_test_key";
 const FIXED_NOW = new Date("2026-10-23T05:17:00.000Z");
 
 const mocks = {
-  queryRaw: vi.fn(),
+  findFirst: vi.fn(),
   ping: vi.fn(),
   set: vi.fn(),
   getRedis: vi.fn(),
@@ -18,7 +18,7 @@ const mocks = {
 
 function createTestApp(overrides: Record<string, unknown> = {}) {
   const router = createKeepaliveRouter({
-    db: { $queryRaw: mocks.queryRaw } as any,
+    db: { business: { findFirst: mocks.findFirst } } as any,
     getRedis: mocks.getRedis as any,
     fetchImpl: mocks.fetchImpl as any,
     token: TOKEN,
@@ -36,7 +36,7 @@ function createTestApp(overrides: Record<string, unknown> = {}) {
 }
 
 function expectNoDependencyCalled() {
-  expect(mocks.queryRaw).not.toHaveBeenCalled();
+  expect(mocks.findFirst).not.toHaveBeenCalled();
   expect(mocks.getRedis).not.toHaveBeenCalled();
   expect(mocks.ping).not.toHaveBeenCalled();
   expect(mocks.set).not.toHaveBeenCalled();
@@ -54,7 +54,7 @@ describe("GET /api/keepalive", () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.queryRaw.mockResolvedValue([{ "?column?": 1 }]);
+    mocks.findFirst.mockResolvedValue({ id: "business-1" });
     mocks.ping.mockResolvedValue("PONG");
     mocks.set.mockResolvedValue("OK");
     mocks.getRedis.mockResolvedValue({ ping: mocks.ping, set: mocks.set });
@@ -87,12 +87,50 @@ describe("GET /api/keepalive", () => {
       expect(disabled.status).toBe(404);
       expectNoDependencyCalled();
 
-      vi.stubEnv("KEEPALIVE_TOKEN", "env-token-value");
+      vi.stubEnv("KEEPALIVE_TOKEN", "env-token-value-0123456789");
       const enabled = await request(createTestApp({ token: undefined }))
         .get("/api/keepalive")
-        .set("Authorization", "Bearer env-token-value");
+        .set("Authorization", "Bearer env-token-value-0123456789");
 
       expect(enabled.status).toBe(200);
+    });
+
+    it("is disabled when the token is whitespace only", async () => {
+      const response = await request(createTestApp({ token: " ".repeat(20) }))
+        .get("/api/keepalive")
+        .set("Authorization", "Bearer x");
+
+      expect(response.status).toBe(404);
+      expectNoDependencyCalled();
+    });
+
+    it("is disabled when the trimmed token is shorter than 16 characters", async () => {
+      const short = "a".repeat(15);
+      const response = await request(createTestApp({ token: `  ${short}
+` }))
+        .get("/api/keepalive")
+        .set("Authorization", `Bearer ${short}`);
+
+      expect(response.status).toBe(404);
+      expectNoDependencyCalled();
+    });
+
+    it("works with a token of exactly 16 characters", async () => {
+      const minimum = "b".repeat(16);
+      const response = await request(createTestApp({ token: minimum }))
+        .get("/api/keepalive")
+        .set("Authorization", `Bearer ${minimum}`);
+
+      expect(response.status).toBe(200);
+    });
+
+    it("trims whitespace around the configured token", async () => {
+      const response = await request(createTestApp({ token: `${TOKEN} 
+` }))
+        .get("/api/keepalive")
+        .set("Authorization", `Bearer ${TOKEN}`);
+
+      expect(response.status).toBe(200);
     });
 
     it("rejects a missing Authorization header with 401 and calls no dependency", async () => {
@@ -168,12 +206,20 @@ describe("GET /api/keepalive", () => {
       expect(errorSpy).not.toHaveBeenCalled();
     });
 
-    it("runs a real raw query against the database", async () => {
+    it("reads a real row from the database", async () => {
       await authed(createTestApp());
 
-      expect(mocks.queryRaw).toHaveBeenCalledTimes(1);
-      const [strings] = mocks.queryRaw.mock.calls[0];
-      expect(Array.from(strings).join("")).toBe("SELECT 1");
+      expect(mocks.findFirst).toHaveBeenCalledTimes(1);
+      expect(mocks.findFirst).toHaveBeenCalledWith({ select: { id: true } });
+    });
+
+    it("treats an empty table as healthy", async () => {
+      mocks.findFirst.mockResolvedValue(null);
+
+      const response = await authed(createTestApp());
+
+      expect(response.status).toBe(200);
+      expect(response.body.checks.database).toBe("ok");
     });
 
     it("pings Redis and writes a key with an expiry", async () => {
@@ -225,7 +271,7 @@ describe("GET /api/keepalive", () => {
     }
 
     it("reports only the database as failed when it rejects", async () => {
-      mocks.queryRaw.mockRejectedValue(new Error(`connect failed ${secretNoise}`));
+      mocks.findFirst.mockRejectedValue(new Error(`connect failed ${secretNoise}`));
 
       const response = await authed(createTestApp());
 
@@ -323,6 +369,24 @@ describe("GET /api/keepalive", () => {
       expectCleanBody(response.body);
     });
 
+    it("logs the numeric HTTP status (and nothing else) when Supabase answers non-2xx", async () => {
+      mocks.fetchImpl.mockResolvedValue({
+        ok: false,
+        status: 521,
+        statusText: "Secret Reason https://leak.example",
+      });
+
+      await authed(createTestApp());
+
+      const call = errorSpy.mock.calls.find((args) => args[1] === "supabase");
+      expect(call).toBeDefined();
+      expect(String(call?.[2])).toContain("521");
+      const logged = JSON.stringify(errorSpy.mock.calls);
+      expect(logged).not.toContain("leak.example");
+      expect(logged).not.toContain("Secret Reason");
+      expect(logged).not.toContain(SUPABASE_URL);
+    });
+
     it("reports Supabase as failed when the project URL or key is not configured", async () => {
       const response = await authed(
         createTestApp({ supabaseUrl: "", supabaseKey: "" }),
@@ -334,7 +398,7 @@ describe("GET /api/keepalive", () => {
     });
 
     it("runs the other checks even when one fails", async () => {
-      mocks.queryRaw.mockRejectedValue(new Error("db down"));
+      mocks.findFirst.mockRejectedValue(new Error("db down"));
       mocks.ping.mockRejectedValue(new Error("redis down"));
       mocks.fetchImpl.mockRejectedValue(new Error("auth down"));
 
@@ -346,14 +410,14 @@ describe("GET /api/keepalive", () => {
         redis: "failed",
         supabase: "failed",
       });
-      expect(mocks.queryRaw).toHaveBeenCalledTimes(1);
+      expect(mocks.findFirst).toHaveBeenCalledTimes(1);
       expect(mocks.ping).toHaveBeenCalledTimes(1);
       expect(mocks.fetchImpl).toHaveBeenCalledTimes(1);
       expect(errorSpy).toHaveBeenCalledTimes(3);
     });
 
     it("never logs the token, a connection string, or a credentialed URL", async () => {
-      mocks.queryRaw.mockRejectedValue(
+      mocks.findFirst.mockRejectedValue(
         Object.assign(new Error(`bad ${secretNoise}`), { code: "P1001" }),
       );
       mocks.ping.mockRejectedValue(new Error(`bad ${secretNoise}`));
@@ -375,7 +439,7 @@ describe("GET /api/keepalive", () => {
 
   describe("timeouts", () => {
     it("reports a check that never resolves as failed without hanging", async () => {
-      mocks.queryRaw.mockReturnValue(new Promise(() => {}));
+      mocks.findFirst.mockReturnValue(new Promise(() => {}));
       mocks.ping.mockReturnValue(new Promise(() => {}));
       mocks.fetchImpl.mockReturnValue(new Promise(() => {}));
 
@@ -403,6 +467,22 @@ describe("GET /api/keepalive", () => {
         redis: "ok",
         supabase: "failed",
       });
+    });
+
+    it("reports Redis as failed when the client never becomes available", async () => {
+      mocks.getRedis.mockReturnValue(new Promise(() => {}));
+
+      const started = Date.now();
+      const response = await authed(createTestApp({ timeoutMs: 20 }));
+
+      expect(Date.now() - started).toBeLessThan(900);
+      expect(response.status).toBe(503);
+      expect(response.body.checks).toEqual({
+        database: "ok",
+        redis: "failed",
+        supabase: "ok",
+      });
+      expect(mocks.ping).not.toHaveBeenCalled();
     });
 
     it("aborts the Supabase request when it times out", async () => {

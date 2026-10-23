@@ -10,13 +10,14 @@ import { prisma } from "@direconnect/db";
  * are not paused or archived for inactivity.
  *
  * Protected by a shared bearer token (KEEPALIVE_TOKEN); disabled with a 404 when
- * the token is not configured. Dependency errors are only ever logged on the
+ * the token is not configured or, after trimming, shorter than 16 characters. Dependency errors are only ever logged on the
  * server, in a reduced form, and never returned to the caller.
  */
 
 const REDIS_KEY = "keepalive:last";
 const REDIS_KEY_TTL_SECONDS = 60 * 60 * 24 * 14;
 const DEFAULT_TIMEOUT_MS = 10_000;
+const MIN_TOKEN_LENGTH = 16;
 
 type CheckName = "database" | "redis" | "supabase";
 type CheckResult = "ok" | "failed";
@@ -27,7 +28,7 @@ type RedisLike = {
 };
 
 export type KeepaliveDeps = {
-  db?: Pick<typeof prisma, "$queryRaw">;
+  db?: Pick<typeof prisma, "business">;
   getRedis?: () => Promise<RedisLike> | RedisLike;
   fetchImpl?: typeof fetch;
   token?: string;
@@ -51,6 +52,17 @@ class CheckFailedError extends Error {
   }
 }
 
+/** Supabase Auth answered, but not with a 2xx status. Only the number is kept. */
+class HttpStatusError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super("Unexpected HTTP status");
+    this.name = "HttpStatusError";
+    this.status = status;
+  }
+}
+
 /**
  * Prisma, pg, ioredis and undici error messages can contain host names, ports,
  * user names or URLs, so only the error type and a short machine code are
@@ -66,6 +78,10 @@ function describeError(error: unknown): string {
     typeof code === "string" && /^[A-Za-z0-9_]{1,40}$/.test(code)
       ? ` (${code})`
       : "";
+
+  if (error instanceof HttpStatusError && Number.isInteger(error.status)) {
+    return `${error.name} (HTTP ${error.status})`;
+  }
 
   return `${error.name}${safeCode}`;
 }
@@ -123,9 +139,9 @@ export function createKeepaliveRouter(deps: KeepaliveDeps = {}) {
   keepaliveRouter.get("/", async (req, res) => {
     // Environment values are read per request so the endpoint follows the
     // process environment as it is at call time.
-    const token = deps.token ?? process.env.KEEPALIVE_TOKEN;
+    const token = (deps.token ?? process.env.KEEPALIVE_TOKEN ?? "").trim();
 
-    if (!token) {
+    if (token.length < MIN_TOKEN_LENGTH) {
       return res.status(404).json({ error: "Not found" });
     }
 
@@ -140,7 +156,8 @@ export function createKeepaliveRouter(deps: KeepaliveDeps = {}) {
     const checks: Record<CheckName, () => Promise<void>> = {
       database: () =>
         withTimeout(async () => {
-          await db.$queryRaw`SELECT 1`;
+          // A real row read (the result is ignored; an empty table is fine).
+          await db.business.findFirst({ select: { id: true } });
         }, timeoutMs),
 
       redis: () =>
@@ -171,9 +188,7 @@ export function createKeepaliveRouter(deps: KeepaliveDeps = {}) {
           void response.body?.cancel().catch(() => {});
 
           if (!response.ok) {
-            throw new CheckFailedError(
-              `Supabase Auth answered with HTTP ${response.status}`,
-            );
+            throw new HttpStatusError(response.status);
           }
         }, timeoutMs),
     };
