@@ -88,11 +88,21 @@ export default function SignupPage() {
     );
   }
 
+  if (!closedByError && signupStatus === "checking") {
+    return (
+      <AuthCard title="Create account">
+        <p role="status" className="text-sm text-muted">
+          Checking whether sign-up is open…
+        </p>
+      </AuthCard>
+    );
+  }
+
   if (signupStatus === "closed" || closedByError) {
     return (
       <AuthCard title={SIGNUP_CLOSED_TITLE}>
         <div className="space-y-4">
-          <SignupClosedNotice />
+          <SignupClosedNotice focusOnMount={closedByError} />
           <Link href="/login" className={buttonClasses({ variant: "primary", className: "w-full" })}>
             Go to log in
           </Link>

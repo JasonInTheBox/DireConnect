@@ -40,11 +40,11 @@ export default function Home() {
           <Link href="/login" className={buttonClasses({ variant: "primary" })}>
             Log in
           </Link>
-          {signupStatus === "closed" ? null : (
+          {signupStatus === "open" ? (
             <Link href="/signup" className={buttonClasses({ variant: "secondary" })}>
               Sign up
             </Link>
-          )}
+          ) : null}
         </div>
         {signupStatus === "closed" ? (
           <div className="mt-6">

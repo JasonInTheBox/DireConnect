@@ -68,14 +68,14 @@ export default function LoginPage() {
       footer={
         signupStatus === "closed" ? (
           "New accounts aren’t being created right now."
-        ) : (
+        ) : signupStatus === "open" ? (
           <>
             Don’t have an account?{" "}
             <Link href="/signup" className="font-medium text-accent hover:underline">
               Sign up
             </Link>
           </>
-        )
+        ) : null
       }
     >
       <form onSubmit={handleLogin} noValidate className="space-y-4">

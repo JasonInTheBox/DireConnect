@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SIGNUP_CLOSED_TEXT,
   SIGNUP_CLOSED_TITLE,
+  initialSignupStatus,
   isSignupDisabledError,
   parseSignupSettings,
 } from "./signupStatus";
@@ -40,5 +41,17 @@ describe("copy", () => {
   it("explains that the project is non-commercial", () => {
     expect(SIGNUP_CLOSED_TITLE).toBe("Sign-up is closed");
     expect(SIGNUP_CLOSED_TEXT).toContain("non-commercial");
+  });
+});
+
+describe("initialSignupStatus", () => {
+  it("waits for the settings request only when Supabase is configured", () => {
+    expect(initialSignupStatus("https://x.supabase.co", "key")).toBe("checking");
+  });
+
+  it("is open at once, without a request, when the URL or key is unset or empty", () => {
+    expect(initialSignupStatus(undefined, "key")).toBe("open");
+    expect(initialSignupStatus("https://x.supabase.co", undefined)).toBe("open");
+    expect(initialSignupStatus("", "")).toBe("open");
   });
 });

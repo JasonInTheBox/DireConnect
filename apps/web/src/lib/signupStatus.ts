@@ -2,6 +2,17 @@ export const SIGNUP_CLOSED_TITLE = "Sign-up is closed";
 export const SIGNUP_CLOSED_TEXT =
   "DireConnect is a non-commercial project, so new accounts aren’t being created right now. If you already have an account, you can log in.";
 
+/**
+ * The first status of the sign-up hook. Without a Supabase URL and publishable key there is nothing
+ * to ask, so the form is shown at once ("open") instead of waiting for a request that cannot run.
+ */
+export function initialSignupStatus(
+  supabaseUrl: string | undefined,
+  publishableKey: string | undefined,
+): "checking" | "open" {
+  return supabaseUrl && publishableKey ? "checking" : "open";
+}
+
 export type SignupSettings = "open" | "closed" | "unknown";
 
 /** Reads `disable_signup` from the body of Supabase Auth's public `GET /auth/v1/settings`. */
