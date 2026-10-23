@@ -1,0 +1,138 @@
+"use client";
+
+import { useEffect, useId, useRef, type ReactNode } from "react";
+import { cn } from "@/lib/cn";
+import { Icon } from "./icons";
+
+type DialogProps = {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  description?: string;
+  children: ReactNode;
+  placement?: "center" | "left";
+  /** Keep the title for screen readers but do not show a header. */
+  hideTitle?: boolean;
+  /** When false (a request is in flight) Escape, the backdrop and the Close button do nothing. */
+  dismissible?: boolean;
+};
+
+export function Dialog({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  placement = "center",
+  hideTitle = false,
+  dismissible = true,
+}: DialogProps) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const pointerDownOnBackdrop = useRef(false);
+  const titleId = useId();
+  const descriptionId = useId();
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) {
+      return;
+    }
+    if (open && !element.open) {
+      element.showModal();
+      element.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+    } else if (!open && element.open) {
+      element.close();
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
+
+  const isDrawer = placement === "left";
+
+  return (
+    <dialog
+      ref={ref}
+      aria-labelledby={titleId}
+      aria-describedby={description ? descriptionId : undefined}
+      // Handle Escape ourselves so `open` stays the single source of truth.
+      onCancel={(event) => {
+        event.preventDefault();
+        if (dismissible) {
+          onClose();
+        }
+      }}
+      // Fires after element.close(). Only act on closes we did not ask for, such as a
+      // browser force-closing on a repeated Escape.
+      onClose={() => {
+        if (!open) {
+          return;
+        }
+        if (dismissible) {
+          onClose();
+        } else {
+          ref.current?.showModal();
+        }
+      }}
+      onPointerDown={(event) => {
+        pointerDownOnBackdrop.current = event.target === event.currentTarget;
+      }}
+      onClick={(event) => {
+        // Close only when both the press and the release landed on the backdrop itself,
+        // so a drag that starts inside the content and ends outside does not dismiss.
+        const startedOnBackdrop = pointerDownOnBackdrop.current;
+        pointerDownOnBackdrop.current = false;
+        if (dismissible && startedOnBackdrop && event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+      className={cn(
+        "bg-surface p-0 text-ink shadow-float backdrop:bg-black/50",
+        isDrawer
+          ? "drawer m-0 mr-auto h-dvh max-h-none w-72 max-w-[85vw] overflow-visible border-r border-line"
+          : "m-auto w-[calc(100%-2rem)] max-w-md rounded-container border border-line",
+      )}
+    >
+      {open ? (
+        <div className={cn(isDrawer ? "flex h-full flex-col" : "p-5")}>
+          {hideTitle ? (
+            <h2 id={titleId} className="sr-only">
+              {title}
+            </h2>
+          ) : (
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h2 id={titleId} className="break-words text-base font-semibold">
+                  {title}
+                </h2>
+                {description ? (
+                  <p id={descriptionId} className="mt-1 break-words text-sm text-muted">
+                    {description}
+                  </p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={onClose}
+                disabled={!dismissible}
+                className="-my-2 -mr-3 flex min-h-10 min-w-10 items-center justify-center rounded-control text-muted transition-colors hover:bg-sunken hover:text-ink disabled:pointer-events-none disabled:opacity-50 lg:-my-1.5 lg:-mr-2.5 lg:min-h-9 lg:min-w-9"
+              >
+                <Icon name="x" />
+              </button>
+            </div>
+          )}
+          {children}
+        </div>
+      ) : null}
+    </dialog>
+  );
+}

@@ -1,67 +1,46 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { apiUrl } from "@/lib/api";
+import { buttonClasses } from "@/components/ui/button";
+import { pageTitle } from "@/lib/pageTitle";
+import { supabase } from "@/lib/supabase";
+import { useApiWarmup } from "@/lib/useApiWarmup";
 
 export default function Home() {
+  const router = useRouter();
+
+  useApiWarmup();
 
   useEffect(() => {
-    async function checkApiHealth() {
-      try {
-        const response = await fetch(apiUrl("/health"));
-        if (!response.ok) {
-          throw new Error(`API health check failed (${response.status})`);
-        }
-      } catch (error) {
-        console.error("Could not reach the DireConnect API:", error);
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        router.replace("/businesses");
       }
-    }
-
-    void checkApiHealth();
-  }, []);
+    });
+  }, [router]);
 
   return (
-    <main className="min-h-screen bg-gray-950 px-6 py-12 text-gray-100">
-      <div className="mx-auto max-w-4xl">
-        <section className="rounded-2xl border border-gray-800 bg-gray-900 p-8 shadow-sm">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-blue-400">
-            DireConnect
-          </p>
-
-          <h1 className="text-4xl font-bold tracking-tight">
-            Connect small businesses with their customers directly.
-          </h1>
-
-          <p className="mt-4 max-w-2xl text-gray-400">
-            Manage businesses, customers, and promotional campaigns from one
-            simple dashboard.
-          </p>
-
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link
-              href="/login"
-              className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
-            >
-              Log in
-            </Link>
-
-            <Link
-              href="/signup"
-              className="rounded-lg bg-gray-800 px-4 py-2 font-semibold text-gray-100 hover:bg-gray-700"
-            >
-              Sign up
-            </Link>
-
-            <Link
-              href="/businesses"
-              className="rounded-lg border border-gray-700 px-4 py-2 font-semibold text-gray-100 hover:bg-gray-800"
-            >
-              Go to Businesses
-            </Link>
-          </div>
-        </section>
+    <main className="flex min-h-screen items-center justify-center px-4 py-10">
+      <title>{pageTitle("")}</title>
+      <div className="w-full max-w-lg text-center">
+        <p className="text-sm font-semibold tracking-tight">DireConnect</p>
+        <h1 className="mt-6 text-3xl font-semibold tracking-tight">
+          Talk to your customers directly.
+        </h1>
+        <p className="mx-auto mt-3 max-w-md text-muted">
+          Keep your customer list in one place, send email campaigns to the people who asked to hear
+          from you, and see what was delivered.
+        </p>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <Link href="/login" className={buttonClasses({ variant: "primary" })}>
+            Log in
+          </Link>
+          <Link href="/signup" className={buttonClasses({ variant: "secondary" })}>
+            Sign up
+          </Link>
+        </div>
       </div>
     </main>
   );

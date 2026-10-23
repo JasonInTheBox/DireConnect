@@ -1,0 +1,342 @@
+import { expect, test, type Page } from "@playwright/test";
+import { business, mockApi, signIn } from "./helpers/app";
+
+const bakery = business("b1", "Corner Bakery");
+const RECOVERY_LINK =
+  "/reset-password#access_token=test-access-token&refresh_token=test-refresh-token&expires_in=3600&token_type=bearer&type=recovery";
+const CONFIRMATION = "a reset link is on its way. Check your inbox and spam folder.";
+
+/** Answers the token-validation request supabase-js makes for a recovery link as an expired token would. */
+async function rejectRecoveryToken(page: Page) {
+  await page.route("https://example.supabase.co/auth/v1/user", async (route) => {
+    if (route.request().method() !== "GET") {
+      return route.fallback();
+    }
+    return route.fulfill({
+      status: 401,
+      headers: { "access-control-allow-origin": "*" },
+      contentType: "application/json",
+      body: JSON.stringify({ code: 401, error_code: "bad_jwt", msg: "invalid JWT: token is expired" }),
+    });
+  });
+}
+
+test("the login page links to the forgot-password page", async ({ page }) => {
+  await page.goto("/login");
+  const link = page.getByRole("link", { name: "Forgot password?" });
+  await expect(link).toHaveAttribute("href", "/forgot-password");
+  await link.click();
+  await expect(page).toHaveURL(/\/forgot-password$/);
+  await expect(page.getByRole("heading", { name: "Reset your password" })).toBeVisible();
+});
+
+test("the forgot-password page validates the email inline without a network call", async ({ page }) => {
+  const state = await mockApi(page, { businesses: [bakery] });
+  await page.goto("/forgot-password");
+  const email = page.getByRole("textbox", { name: "Email", exact: true });
+
+  await page.getByRole("button", { name: "Send reset link" }).click();
+  await expect(page.getByText("Enter your email address.")).toBeVisible();
+  await expect(email).toBeFocused();
+
+  await email.fill("not-an-email");
+  await page.getByRole("button", { name: "Send reset link" }).click();
+  await expect(page.getByText("Enter a valid email address.")).toBeVisible();
+  await expect(email).toBeFocused();
+
+  expect(state.authRequests.filter((request) => request.path === "/auth/v1/recover")).toHaveLength(0);
+});
+
+test("a valid email sends one reset request and shows the neutral confirmation", async ({ page }) => {
+  const state = await mockApi(page, { businesses: [bakery] });
+  await page.goto("/forgot-password");
+
+  await page.getByRole("textbox", { name: "Email", exact: true }).fill(" ada@example.com ");
+  await page.getByRole("button", { name: "Send reset link" }).click();
+
+  await expect(page.getByText(`If an account exists for ada@example.com, ${CONFIRMATION}`)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Reset your password" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Email", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Back to log in" })).toHaveAttribute("href", "/login");
+
+  const recovers = state.authRequests.filter((request) => request.path === "/auth/v1/recover");
+  expect(recovers).toHaveLength(1);
+  expect(recovers[0].body).toMatchObject({ email: "ada@example.com" });
+  const redirectTo = new URLSearchParams(recovers[0].search).get("redirect_to");
+  expect(redirectTo).toMatch(/\/reset-password$/);
+});
+
+test("an address with no account gets exactly the same confirmation", async ({ page }) => {
+  // The mock answers 200 for every address, as Supabase does, so nothing here may depend on the answer.
+  const state = await mockApi(page, { businesses: [bakery] });
+  await page.goto("/forgot-password");
+
+  await page.getByRole("textbox", { name: "Email", exact: true }).fill("nobody@example.com");
+  await page.getByRole("button", { name: "Send reset link" }).click();
+
+  await expect(
+    page.getByText(`If an account exists for nobody@example.com, ${CONFIRMATION}`),
+  ).toBeVisible();
+  expect(state.authRequests.filter((request) => request.path === "/auth/v1/recover")).toHaveLength(1);
+});
+
+test("an answer other than success or a rate limit still shows the neutral confirmation", async ({ page }) => {
+  await mockApi(page, { businesses: [bakery] });
+  await page.route("https://example.supabase.co/auth/v1/recover*", async (route) => {
+    if (route.request().method() === "OPTIONS") {
+      return route.fallback();
+    }
+    return route.fulfill({
+      status: 400,
+      headers: { "access-control-allow-origin": "*" },
+      contentType: "application/json",
+      body: JSON.stringify({ code: 400, error_code: "validation_failed", msg: "Unable to validate email address" }),
+    });
+  });
+  await page.goto("/forgot-password");
+
+  await page.getByRole("textbox", { name: "Email", exact: true }).fill("ada@example.com");
+  await page.getByRole("button", { name: "Send reset link" }).click();
+
+  await expect(page.getByText(`If an account exists for ada@example.com, ${CONFIRMATION}`)).toBeVisible();
+  await expect(page.getByText("Unable to validate email address")).toHaveCount(0);
+});
+
+type Recover = NonNullable<NonNullable<Parameters<typeof mockApi>[1]["authErrors"]>["recover"]>;
+
+/** Requests a reset for ada@example.com against a mock that answers as given; returns what the page says. */
+async function resetOutcome(page: Page, recover?: Recover) {
+  const state = await mockApi(page, { businesses: [bakery], authErrors: recover ? { recover } : undefined });
+  await page.goto("/forgot-password");
+  await page.getByRole("textbox", { name: "Email", exact: true }).fill("ada@example.com");
+  await page.getByRole("button", { name: "Send reset link" }).click();
+  const confirmation = page.getByText(/^If an account exists for/);
+  const sent = await confirmation.waitFor({ timeout: 5_000 }).then(
+    () => true,
+    () => false,
+  );
+  return { state, sent, text: sent ? await confirmation.innerText() : null };
+}
+
+test.describe("failures that only a registered address can cause look exactly like success", () => {
+  // Supabase answers an unknown address with a silent 200 before sending, so none of these may be shown.
+  const cases: Array<[string, Recover]> = [
+    [
+      "the per-address cooldown",
+      {
+        status: 429,
+        code: "over_email_send_rate_limit",
+        message: "For security purposes, you can only request this after 52 seconds.",
+      },
+    ],
+    ["the project-wide email limit", "Email rate limit exceeded"],
+    ["an SMTP or server error (500)", { status: 500, code: "unexpected_failure", message: "Error sending recovery email" }],
+    ["a bad gateway (502)", { status: 502, code: "unexpected_failure", message: "Bad gateway" }],
+  ];
+
+  for (const [name, recover] of cases) {
+    test(name, async ({ page }) => {
+      const success = await resetOutcome(page);
+      expect(success.sent).toBe(true);
+
+      const outcome = await resetOutcome(page, recover);
+      expect(outcome.sent).toBe(true);
+      expect(outcome.text).toBe(success.text);
+      await expect(page.getByRole("textbox", { name: "Email", exact: true })).toHaveCount(0);
+      await expect(page.getByRole("alert").filter({ hasText: /\w/ })).toHaveCount(0);
+      expect(outcome.state.authRequests.filter((request) => request.path === "/auth/v1/recover")).toHaveLength(1);
+    });
+  }
+});
+
+test("a rate limit that says nothing about the address shows generic copy and keeps the form", async ({ page }) => {
+  await mockApi(page, {
+    businesses: [bakery],
+    authErrors: {
+      recover: { status: 429, code: "over_request_rate_limit", message: "Request rate limit reached" },
+    },
+  });
+  await page.goto("/forgot-password");
+
+  await page.getByRole("textbox", { name: "Email", exact: true }).fill("ada@example.com");
+  await page.getByRole("button", { name: "Send reset link" }).click();
+
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Too many requests. Wait a few minutes and try again." }),
+  ).toBeVisible();
+  await expect(page.getByText("Request rate limit reached")).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "Email", exact: true })).toHaveValue("ada@example.com");
+  await expect(page.getByRole("button", { name: "Send reset link" })).toBeVisible();
+  await expect(page.getByText(CONFIRMATION)).toHaveCount(0);
+});
+
+test("a network failure says the email was not sent and keeps the form", async ({ page }) => {
+  await mockApi(page, { businesses: [bakery] });
+  await page.route("https://example.supabase.co/auth/v1/recover*", async (route) => {
+    if (route.request().method() === "OPTIONS") {
+      return route.fallback();
+    }
+    return route.abort("failed");
+  });
+  await page.goto("/forgot-password");
+
+  await page.getByRole("textbox", { name: "Email", exact: true }).fill("ada@example.com");
+  await page.getByRole("button", { name: "Send reset link" }).click();
+
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Could not send the email. Check your connection and try again." }),
+  ).toBeVisible();
+  await expect(page.getByText(CONFIRMATION)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Send reset link" })).not.toHaveAttribute("aria-disabled", "true");
+});
+
+test("the reset page without a link says so and offers a new one", async ({ page }) => {
+  await mockApi(page, { businesses: [bakery] });
+  await page.goto("/reset-password");
+
+  await expect(page.getByText("This reset link has expired or was already used.")).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByRole("link", { name: "Request a new link" })).toHaveAttribute("href", "/forgot-password");
+  await expect(page.getByRole("textbox")).toHaveCount(0);
+});
+
+test("a signed-in visitor without a link does not get the form", async ({ page }) => {
+  await signIn(page);
+  await mockApi(page, { businesses: [bakery] });
+  await page.goto("/reset-password");
+
+  await expect(page.getByText("This reset link has expired or was already used.")).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByLabel("New password")).toHaveCount(0);
+});
+
+test("a rejected link does not open the form, even when someone is already signed in", async ({ page }) => {
+  await signIn(page);
+  await mockApi(page, { businesses: [bakery] });
+  await rejectRecoveryToken(page);
+  // A different token from the seeded session's, as an emailed link would carry.
+  await page.goto(RECOVERY_LINK.replace("test-access-token", "expired-link-token"));
+
+  await expect(page.getByText("This reset link has expired or was already used.")).toBeVisible({ timeout: 8_000 });
+  await expect(page.getByRole("link", { name: "Request a new link" })).toHaveAttribute("href", "/forgot-password");
+  await expect(page.getByLabel("New password")).toHaveCount(0);
+});
+
+test("a slow link check waits instead of calling the link expired", async ({ page }) => {
+  await mockApi(page, { businesses: [bakery] });
+  await page.route("https://example.supabase.co/auth/v1/user", async (route) => {
+    if (route.request().method() === "GET") {
+      await new Promise((resolve) => setTimeout(resolve, 4_000));
+    }
+    await route.fallback();
+  });
+  await page.goto(RECOVERY_LINK);
+
+  await expect(page.getByText("Checking your reset link…")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "New password", exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("This reset link has expired or was already used.")).toHaveCount(0);
+});
+
+test("a valid recovery link opens the form, validates it and changes the password", async ({ page }) => {
+  const state = await mockApi(page, { businesses: [bakery] });
+  await page.goto(RECOVERY_LINK);
+
+  const password = page.getByRole("textbox", { name: "New password", exact: true });
+  const confirm = page.getByRole("textbox", { name: "Repeat new password", exact: true });
+  await expect(password).toBeVisible({ timeout: 8_000 });
+  await expect(page.getByRole("heading", { name: "Choose a new password" })).toBeVisible();
+
+  // supabase-js validated the token with GET /user and called no other endpoint.
+  expect(state.authRequests.filter((request) => request.path === "/auth/v1/user").map((request) => request.method)).toEqual([
+    "GET",
+  ]);
+
+  // The link's tokens do not stay in the address bar.
+  await expect.poll(() => new URL(page.url()).hash).toBe("");
+
+  const change = page.getByRole("button", { name: "Change password" });
+  await change.click();
+  await expect(page.getByText("Enter a new password.")).toBeVisible();
+  await expect(page.getByText("Repeat the new password.")).toBeVisible();
+  await expect(password).toBeFocused();
+
+  await password.fill("correct horse battery");
+  await confirm.fill("something different");
+  await change.click();
+  await expect(page.getByText("The passwords don’t match.")).toBeVisible();
+  await expect(confirm).toBeFocused();
+  expect(state.authRequests.filter((request) => request.method === "PUT")).toHaveLength(0);
+
+  await confirm.fill("correct horse battery");
+  await change.click();
+
+  await expect(page).toHaveURL(/\/businesses$/);
+  await expect(page.getByText("Password changed")).toBeVisible();
+
+  const updates = state.authRequests.filter((request) => request.method === "PUT" && request.path === "/auth/v1/user");
+  expect(updates).toHaveLength(1);
+  expect(updates[0].body).toMatchObject({ password: "correct horse battery" });
+  const others = state.authRequests.filter(
+    (request) => request.path === "/auth/v1/logout" && request.search?.includes("scope=others"),
+  );
+  expect(others).toHaveLength(1);
+});
+
+test("a password Supabase refuses is explained beside the field", async ({ page }) => {
+  const state = await mockApi(page, {
+    businesses: [bakery],
+    authErrors: { updateUser: "Password should be at least 8 characters." },
+  });
+  await page.goto(RECOVERY_LINK);
+
+  await page.getByRole("textbox", { name: "New password", exact: true }).fill("short");
+  await page.getByRole("textbox", { name: "Repeat new password", exact: true }).fill("short");
+  await page.getByRole("button", { name: "Change password" }).click();
+
+  await expect(page.getByText("Password should be at least 8 characters.")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "New password", exact: true })).toBeFocused();
+  await expect(page).toHaveURL(/\/reset-password/);
+  expect(state.authRequests.filter((request) => request.path === "/auth/v1/logout")).toHaveLength(0);
+});
+
+test("a reload after the form opened no longer counts as a reset link", async ({ page }) => {
+  await mockApi(page, { businesses: [bakery] });
+  await page.goto(RECOVERY_LINK);
+  await expect(page.getByRole("textbox", { name: "New password", exact: true })).toBeVisible({ timeout: 8_000 });
+  await expect.poll(() => new URL(page.url()).hash).toBe("");
+
+  await page.reload();
+  await expect(page.getByText("This reset link has expired or was already used.")).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByLabel("New password")).toHaveCount(0);
+});
+
+test("visiting the reset page again after a successful change shows the expired state", async ({ page }) => {
+  await mockApi(page, { businesses: [bakery] });
+  await page.goto(RECOVERY_LINK);
+  await page.getByRole("textbox", { name: "New password", exact: true }).fill("correct horse battery");
+  await page.getByRole("textbox", { name: "Repeat new password", exact: true }).fill("correct horse battery");
+  await page.getByRole("button", { name: "Change password" }).click();
+  await expect(page).toHaveURL(/\/businesses$/);
+
+  // A client-side visit, so module state survives: the used link must not be remembered.
+  await page.evaluate(() => (window as unknown as { next: { router: { push: (url: string) => void } } }).next.router.push("/reset-password"));
+  await expect(page).toHaveURL(/\/reset-password$/);
+  await expect(page.getByText("This reset link has expired or was already used.")).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByLabel("New password")).toHaveCount(0);
+});
+
+test("a reset that never reaches the server says so, not the browser's text", async ({ page }) => {
+  await mockApi(page, { businesses: [bakery] });
+  await page.route("https://example.supabase.co/auth/v1/user", (route) =>
+    route.request().method() === "PUT" ? route.abort("failed") : route.fallback(),
+  );
+  await page.goto(RECOVERY_LINK);
+
+  await page.getByRole("textbox", { name: "New password", exact: true }).fill("correct horse battery");
+  await page.getByRole("textbox", { name: "Repeat new password", exact: true }).fill("correct horse battery");
+  await page.getByRole("button", { name: "Change password" }).click();
+
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Could not reach the server. Check your connection and try again." }),
+  ).toBeVisible();
+  await expect(page.getByText("Failed to fetch")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/reset-password/);
+});
