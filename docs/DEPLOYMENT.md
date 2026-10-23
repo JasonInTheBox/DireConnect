@@ -40,6 +40,7 @@ Vercel Hobby currently costs $0, but its terms restrict use to personal, non-com
    | `REDIS_URL` | The same BullMQ-compatible Redis URL used by the worker |
    | `CAMPAIGN_SENDER_ALLOWLIST` | Comma-separated Supabase Auth user IDs approved to queue production campaigns |
    | `CLIENT_URL` | Comma-separated exact Vercel origins, without trailing slashes or paths |
+   | `KEEPALIVE_TOKEN` | Long random shared secret for `GET /api/keepalive` (see [Keeping services awake](#keeping-services-awake)); leave unset to disable the endpoint |
    | `SENTRY_DSN` | Optional API Sentry DSN; leave unset to disable reporting |
 
    Render provides `PORT`; the blueprint sets the app port to `4000` for clarity. Do not put database, JWT, Redis, Resend, or Sentry secrets in `NEXT_PUBLIC_` variables.
@@ -113,6 +114,27 @@ Resend's Broadcasts API is designed for an Audience or Segment and manages its o
 - The Prisma schema now defaults `Customer.emailOptIn` to `false`. After deploying the code, run `npm run db:push` manually with the production database URLs to sync this column default. It does not change existing customer rows. Do not reset the production database.
 - Supabase Free currently includes 500 MB database storage, 1 GB file storage, and 5 GB egress; free projects can pause after one week of inactivity and do not include automatic backups. Monitor actual project usage and keep independent backups for important data. [Supabase pricing](https://supabase.com/pricing)
 
+## Keeping services awake
+
+Free tiers stop idle services: Supabase pauses free projects after about a week without activity, free Redis databases can be archived, and the Render free API sleeps after roughly 15 minutes. A scheduled GitHub Actions workflow (`.github/workflows/keepalive.yml`) calls `GET /api/keepalive` on the API once a day at 05:17 UTC. The endpoint performs real activity, not just a health check:
+
+- **database**: a `SELECT 1` through Prisma against `DATABASE_URL` (Supabase Postgres).
+- **redis**: a `PING` and a `SET keepalive:last` with a 14-day expiry against `REDIS_URL`.
+- **supabase**: a request to `SUPABASE_URL/auth/v1/settings` (Supabase Auth) with the publishable key.
+
+Each check has a 10-second timeout and runs independently. The endpoint returns `200` with `status: "ok"` when all three pass and `503` with `status: "degraded"` when any fails. The response never contains error details; those are logged on the API only. Calling the API also wakes the Render service as a side effect, which is why the workflow waits up to 2 minutes per attempt and retries 5 times. This covers Supabase and Redis. The Railway worker is a separate service and is not pinged.
+
+Set it up once:
+
+1. Generate a token: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
+2. In Render, add `KEEPALIVE_TOKEN` to the API service environment with that value and let it redeploy. Without it the endpoint answers `404`.
+3. In GitHub, under Settings > Secrets and variables > Actions, add the repository **secret** `KEEPALIVE_TOKEN` (same value) and the repository **variable** `KEEPALIVE_API_URL` (the Render API origin, for example `https://direconnect-api.onrender.com`, without a trailing slash).
+4. Open the Actions tab, choose "Keep services awake", select "Run workflow", and read the log. A healthy run prints `{"status":"ok","checks":{"database":"ok","redis":"ok","supabase":"ok"},"timestamp":"..."}`.
+
+Reading a failure: the run fails (and GitHub emails the repository owner) when the `checks` object in the printed response contains `"failed"`, or when the request itself fails. A `401` means the secret and the Render value differ, a `404` means `KEEPALIVE_TOKEN` is not set on the API, and a failed single check points at that service (check its dashboard and the API logs, where the failure is logged as `keepalive check failed <name>`). The workflow's "Check configuration" step fails early when the secret or variable is missing.
+
+Scheduled workflows only run from the default branch, and GitHub disables them after 60 days without repository activity; re-enable the workflow in the Actions tab if that happens. Rotate the token by changing it in both Render and the GitHub secret.
+
 ## Environment files
 
 Copy the example files to the corresponding ignored local files and keep secrets out of Git:
@@ -120,7 +142,7 @@ Copy the example files to the corresponding ignored local files and keep secrets
 | App | Local file | Main variables |
 | --- | --- | --- |
 | Web | `apps/web/.env.local` | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, optional `NEXT_PUBLIC_SENTRY_DSN` |
-| API | `apps/api/.env` | `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `REDIS_URL`, `CLIENT_URL`, `PORT`, optional `SENTRY_DSN` |
+| API | `apps/api/.env` | `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `REDIS_URL`, `CLIENT_URL`, `PORT`, optional `KEEPALIVE_TOKEN`, optional `SENTRY_DSN` |
 | Worker | `apps/worker/.env` | `DATABASE_URL`, `REDIS_URL`, `APP_URL`, `CAMPAIGN_SENDER_ALLOWLIST`, `MESSAGE_MODE=fake`, optional Resend/Sentry values |
 | Prisma CLI | `packages/db/.env` | `DIRECT_URL` and `DATABASE_URL` |
 

@@ -4,6 +4,7 @@ import { customerRouter } from "./routes/customer.js";
 import { businessRouter } from "./routes/business.js";
 import { campaignRouter } from "./routes/campaign.js";
 import { unsubscribeRouter } from "./routes/unsubscribe.js";
+import { keepaliveRouter } from "./routes/keepalive.js";
 import { initSentry, Sentry } from "./lib/sentry.js";
 
 initSentry();
@@ -44,6 +45,9 @@ app.get("/health", (_req, res) => {
         timestamp: new Date().toISOString(),
     });
 });
+
+// Authenticated by its own shared bearer token (no Supabase user), for the daily keep-alive ping.
+app.use("/api/keepalive", keepaliveRouter);
 
 app.use("/api/businesses", businessRouter);
 app.use("/api/businesses/:businessId/customers", customerRouter);
