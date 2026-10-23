@@ -10,6 +10,7 @@ import { FormError } from "@/components/ui/state";
 import { focusFirstInvalid } from "@/lib/forms";
 import { supabase } from "@/lib/supabase";
 import { useApiWarmup } from "@/lib/useApiWarmup";
+import { useSignupStatus } from "@/lib/useSignupStatus";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,6 +19,7 @@ export default function LoginPage() {
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const signupStatus = useSignupStatus();
 
   useApiWarmup();
 
@@ -64,12 +66,16 @@ export default function LoginPage() {
       title="Log in"
       subtitle="Access your DireConnect business dashboard."
       footer={
-        <>
-          Don’t have an account?{" "}
-          <Link href="/signup" className="font-medium text-accent hover:underline">
-            Sign up
-          </Link>
-        </>
+        signupStatus === "closed" ? (
+          "New accounts aren’t being created right now."
+        ) : (
+          <>
+            Don’t have an account?{" "}
+            <Link href="/signup" className="font-medium text-accent hover:underline">
+              Sign up
+            </Link>
+          </>
+        )
       }
     >
       <form onSubmit={handleLogin} noValidate className="space-y-4">

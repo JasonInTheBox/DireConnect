@@ -230,6 +230,8 @@ type ApiMockOptions = {
   };
   /** When true, a refreshed session reports the email as confirmed. */
   confirmedAfterRefresh?: boolean;
+  /** Turns sign-ups off: the public settings say so and `signUp` answers 422 `signup_disabled`. */
+  signupsDisabled?: boolean;
 };
 
 function dashboardFor(
@@ -366,6 +368,15 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
       return route.fulfill({ status: 204, headers: cors });
     }
 
+    // Public settings the pages read on load; not recorded, so it never shifts the counts below.
+    if (url.pathname === "/auth/v1/settings" && request.method() === "GET") {
+      return json(200, {
+        external: { email: true },
+        disable_signup: Boolean(options.signupsDisabled),
+        mailer_autoconfirm: false,
+      });
+    }
+
     const rawBody = request.postData();
     state.authRequests.push({
       method: request.method(),
@@ -393,6 +404,17 @@ export async function mockApi(page: Page, options: ApiMockOptions) {
     // supabase-js calls this to validate the access token in an emailed recovery link.
     if (url.pathname === "/auth/v1/user" && request.method() === "GET") {
       return json(200, user(true));
+    }
+    if (url.pathname === "/auth/v1/signup" && request.method() === "POST") {
+      if (options.signupsDisabled) {
+        return json(422, {
+          code: 422,
+          error_code: "signup_disabled",
+          msg: "Signups not allowed for this instance",
+        });
+      }
+      // Email confirmation is required: a user comes back, but no session.
+      return json(200, user(false));
     }
     if (url.pathname === "/auth/v1/recover" && request.method() === "POST") {
       const recoverError = options.authErrors?.recover;

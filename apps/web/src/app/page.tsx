@@ -3,13 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { SignupClosedNotice } from "@/components/auth/signup-closed-notice";
 import { buttonClasses } from "@/components/ui/button";
 import { pageTitle } from "@/lib/pageTitle";
 import { supabase } from "@/lib/supabase";
 import { useApiWarmup } from "@/lib/useApiWarmup";
+import { useSignupStatus } from "@/lib/useSignupStatus";
 
 export default function Home() {
   const router = useRouter();
+  const signupStatus = useSignupStatus();
 
   useApiWarmup();
 
@@ -37,10 +40,17 @@ export default function Home() {
           <Link href="/login" className={buttonClasses({ variant: "primary" })}>
             Log in
           </Link>
-          <Link href="/signup" className={buttonClasses({ variant: "secondary" })}>
-            Sign up
-          </Link>
+          {signupStatus === "closed" ? null : (
+            <Link href="/signup" className={buttonClasses({ variant: "secondary" })}>
+              Sign up
+            </Link>
+          )}
         </div>
+        {signupStatus === "closed" ? (
+          <div className="mt-6">
+            <SignupClosedNotice />
+          </div>
+        ) : null}
       </div>
     </main>
   );

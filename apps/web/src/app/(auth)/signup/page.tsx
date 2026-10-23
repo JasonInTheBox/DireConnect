@@ -4,12 +4,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { AuthCard } from "@/components/auth/auth-card";
+import { SignupClosedNotice } from "@/components/auth/signup-closed-notice";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { TextField } from "@/components/ui/field";
 import { FormError } from "@/components/ui/state";
 import { focusFirstInvalid } from "@/lib/forms";
+import { isSignupDisabledError, SIGNUP_CLOSED_TITLE } from "@/lib/signupStatus";
 import { supabase } from "@/lib/supabase";
 import { useApiWarmup } from "@/lib/useApiWarmup";
+import { useSignupStatus } from "@/lib/useSignupStatus";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -19,6 +22,8 @@ export default function SignupPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [checkInbox, setCheckInbox] = useState(false);
+  const [closedByError, setClosedByError] = useState(false);
+  const signupStatus = useSignupStatus();
 
   useApiWarmup();
 
@@ -53,6 +58,10 @@ export default function SignupPage() {
     setSubmitting(false);
 
     if (error) {
+      if (isSignupDisabledError(error)) {
+        setClosedByError(true);
+        return;
+      }
       setFormError(error.message);
       return;
     }
@@ -75,6 +84,19 @@ export default function SignupPage() {
         <Link href="/login" className={buttonClasses({ variant: "primary", className: "w-full" })}>
           Go to log in
         </Link>
+      </AuthCard>
+    );
+  }
+
+  if (signupStatus === "closed" || closedByError) {
+    return (
+      <AuthCard title={SIGNUP_CLOSED_TITLE}>
+        <div className="space-y-4">
+          <SignupClosedNotice />
+          <Link href="/login" className={buttonClasses({ variant: "primary", className: "w-full" })}>
+            Go to log in
+          </Link>
+        </div>
       </AuthCard>
     );
   }
