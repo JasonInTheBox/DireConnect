@@ -70,3 +70,23 @@ lerna-debug.log*
 
 # Prisma generated output if applicable
 generated/
+
+# Environment files: ignore every variant except the committed templates
+.env.*
+!.env.example
+**/.env.*
+!**/.env.example
+
+# Keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Playwright output (regenerated on every run)
+playwright-report/
+test-results/
+
+# Local tooling state
+.superpowers/
+.claude/settings.local.json
