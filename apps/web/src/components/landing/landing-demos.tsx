@@ -111,7 +111,7 @@ export function StepsShowcase({ steps }: { steps: Step[] }) {
               </span>
               <span>
                 <span className="block text-lg font-semibold text-ink">{step.title}</span>
-                <span className={`block text-muted ${selected ? "" : "hidden lg:block"}`}>{step.text}</span>
+                <span className="block text-muted">{step.text}</span>
               </span>
             </button>
           );
@@ -121,11 +121,18 @@ export function StepsShowcase({ steps }: { steps: Step[] }) {
         role="tabpanel"
         id="step-panel"
         aria-labelledby={`step-tab-${active}`}
-        className="min-h-[22rem] rounded-container border border-line bg-surface p-6 shadow-float sm:p-8"
+        className="grid rounded-container border border-line bg-surface p-6 shadow-float sm:p-8"
       >
-        <div key={active} className="[animation:rise_300ms_ease-out]">
-          {steps[active].scene}
-        </div>
+        {/* Every scene shares one grid cell, so the panel keeps the tallest scene's height. */}
+        {steps.map((step, i) => (
+          <div
+            key={step.title}
+            aria-hidden={i !== active}
+            className={`[grid-area:1/1] ${i === active ? "[animation:rise_300ms_ease-out]" : "invisible"}`}
+          >
+            {step.scene}
+          </div>
+        ))}
       </div>
     </div>
   );
