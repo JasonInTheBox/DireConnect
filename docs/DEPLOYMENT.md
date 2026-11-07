@@ -1,6 +1,6 @@
 # Free-tier deployment guide
 
-This repo is configured for a Vercel frontend, a Render Express API, a Railway BullMQ worker, Supabase, Resend email, and a configurable Redis connection.
+This repo is configured for a Vercel frontend, a Render Express API with the BullMQ worker running beside it, Supabase, Resend email, and a configurable Redis connection.
 
 ## What is implemented
 
@@ -18,10 +18,10 @@ This repo is configured for a Vercel frontend, a Render Express API, a Railway B
 Browser -> Vercel Next.js -> Render Express API -> Supabase Postgres/Auth
                                          |       -> Redis/BullMQ queue
                                          |
-                                         +-- Railway worker -> Resend (approved senders only)
+                                         +-- worker (same Render service) -> Resend (approved senders only)
 ```
 
-The API can run on Render Free and has `/health` for health checks. Render Free web services sleep after 15 minutes without inbound traffic and can take about a minute to wake. Render background workers are a different, continuously running service type and are not a free compute option. Run the worker locally for development or a controlled demo; queued or scheduled campaigns will wait while it is offline. Do not use keep-alive requests to simulate an always-on worker. [Render free service limits](https://render.com/docs/free) · [Render background workers](https://render.com/docs/background-workers)
+The API can run on Render Free and has `/health` for health checks. Render Free web services sleep after 15 minutes without inbound traffic and can take about a minute to wake. Render background workers are a different, continuously running service type and are not a free compute option, so the worker runs as a second process in the API service (see `startCommand` in `render.yaml`) and restarts itself if it crashes. Clicking Send wakes the API, so the worker processes the campaign right away. It sleeps with the API, though: a retry that BullMQ delays (for example after a Resend rate limit) runs when the service next wakes. If sends must retry on time, move the worker to a paid Render background worker. [Render free service limits](https://render.com/docs/free) · [Render background workers](https://render.com/docs/background-workers)
 
 Vercel Hobby currently costs $0, but its terms restrict use to personal, non-commercial projects. Use it for a non-commercial portfolio demonstration only. A live commercial SaaS needs a plan that permits commercial use; no paid plan is configured by this repo. [Vercel Hobby plan](https://vercel.com/docs/plans/hobby) · [Vercel terms](https://vercel.com/legal/terms)
 
@@ -75,7 +75,8 @@ Vercel Hobby is only suitable when the project remains personal and non-commerci
 - Keep `REDIS_URL` configurable. Use `redis://localhost:6379` for the included local Docker Compose Redis, or `rediss://...` when a hosted provider offers TLS. ioredis negotiates TLS from the `rediss://` URL.
 - Use one Redis database for the API and worker. Confirm the service supports standard Redis TCP commands and BullMQ's blocking/persistent connections; an HTTP-only Redis API is not sufficient.
 - No provider was named in the current repo configuration, so this change does not switch Redis accounts or assume the existing managed service is free. Check its billing plan or choose a free service that meets the connection requirements. Redis Cloud's current Free Essentials plan does not offer TLS, so consider that before putting its endpoint and password on a public network. [Redis TLS support](https://redis.io/docs/latest/operate/rc/security/database-security/tls-ssl/)
-- The worker runs on Railway in production and locally with `npm run dev:worker` (or `npm run process:campaigns`). Set `NODE_ENV=production` on the Railway service. Configure the same `DATABASE_URL`, `REDIS_URL`, and `CAMPAIGN_SENDER_ALLOWLIST` on Render and Railway. Point `APP_URL` at the public Render API origin so generated unsubscribe links work.
+- In production the worker runs inside the Render API service and shares its environment (`DATABASE_URL`, `REDIS_URL`, `CAMPAIGN_SENDER_ALLOWLIST`, `NODE_ENV=production`). Point `APP_URL` at the public API origin so generated unsubscribe links work. Locally, run it with `npm run dev:worker` (or `npm run process:campaigns`).
+- Never run a local worker against the production Redis: in fake mode it would take real queued campaigns and mark them sent without delivering them. Use the Docker Compose Redis locally.
 - Keep `MESSAGE_MODE=fake` for development, seed data, and CI. Fake mode makes no external request and does not log recipient addresses or message bodies. Only set `MESSAGE_MODE=resend` after reviewing the exact campaign and recipients and intentionally enabling live delivery.
 - BullMQ retries temporary provider failures up to three times with exponential backoff, respecting Resend's `Retry-After` value when it is longer. Campaign and recipient identifiers produce a stable SHA-256 idempotency key for provider retries; sent recipients are skipped on retry, and exhausted jobs remain in BullMQ's failed set while the campaign is marked failed.
 
@@ -83,7 +84,7 @@ Vercel Hobby is only suitable when the project remains personal and non-commerci
 
 Create a Resend API key and verify `direconnect.app` in Resend. The configured sender is `promotions@direconnect.app`. No customer contacts are imported or synchronized by this integration.
 
-Configure the **worker** environment (the API service does not send campaign messages):
+Configure these on the Render API service (its worker process sends the messages):
 
 ```env
 MESSAGE_MODE=resend
@@ -92,12 +93,12 @@ RESEND_FROM_EMAIL=promotions@direconnect.app
 CAMPAIGN_SENDER_ALLOWLIST=<approved Supabase Auth user ID(s)>
 ```
 
-The allowlist is a comma-separated list of Supabase Auth user IDs, not email addresses. Production queueing is denied when the list is empty. Add the same list to Render and Railway; the API checks it before queueing and the worker checks it again before delivery. Set `NODE_ENV=production` on Railway so the worker also refuses fake-mode campaign processing.
+The allowlist is a comma-separated list of Supabase Auth user IDs, not email addresses. Production queueing is denied when the list is empty. The API checks it before queueing and the worker checks it again before delivery. `NODE_ENV=production` (set in `render.yaml`) makes the worker refuse fake-mode campaign processing.
 
 ## Campaign abuse safeguards
 
 - Supabase user emails must be confirmed before a production campaign can be queued. Enable email confirmation in Supabase Auth settings.
-- A production sender must also be manually approved by adding their Supabase Auth user ID to `CAMPAIGN_SENDER_ALLOWLIST` on both Render and Railway. Find the ID in Supabase Dashboard → Authentication → Users. Keep the value empty until you approve the first sender; this intentionally blocks all production sends.
+- A production sender must also be manually approved by adding their Supabase Auth user ID to `CAMPAIGN_SENDER_ALLOWLIST` on Render. Find the ID in Supabase Dashboard → Authentication → Users. Keep the value empty until you approve the first sender; this intentionally blocks all production sends.
 - Campaigns are limited to 10 eligible recipients. The worker independently enforces the same cap.
 - The worker reserves each delivery in Postgres before contacting Resend and enforces rolling limits of 25 messages per account per 24 hours, 100 across the platform per 24 hours, and one campaign email per recipient per 24 hours. Reservations make retries count only once and prevent concurrent jobs from bypassing the limits.
 - The customer form and API default new records to email opt-out; the operator must explicitly record that the contact agreed to receive promotional email. Existing customer consent values are not changed automatically.
@@ -123,7 +124,7 @@ Free tiers stop idle services: Supabase pauses free projects after about a week 
 - **redis**: a `PING` and a `SET keepalive:last` with a 14-day expiry against `REDIS_URL`.
 - **supabase**: a request to `SUPABASE_URL/auth/v1/settings` (Supabase Auth) with the publishable key.
 
-Each check has a 10-second timeout and runs independently. The endpoint returns `200` with `status: "ok"` when all three pass and `503` with `status: "degraded"` when any fails. The response never contains error details; those are logged on the API only. Calling the API also wakes the Render service as a side effect, which is why the workflow waits up to 2 minutes per attempt and retries 5 times, 30 seconds apart. Answers such as `401` (wrong secret) or `404` (token not set on the API) come back immediately, so a wrong secret costs roughly 2.5 minutes of retries. This covers Supabase and Redis. The Railway worker is a separate service and is not pinged.
+Each check has a 10-second timeout and runs independently. The endpoint returns `200` with `status: "ok"` when all three pass and `503` with `status: "degraded"` when any fails. The response never contains error details; those are logged on the API only. Calling the API also wakes the Render service as a side effect, which is why the workflow waits up to 2 minutes per attempt and retries 5 times, 30 seconds apart. Answers such as `401` (wrong secret) or `404` (token not set on the API) come back immediately, so a wrong secret costs roughly 2.5 minutes of retries. This covers Supabase and Redis; waking the API also restarts the worker beside it.
 
 Set it up once:
 
