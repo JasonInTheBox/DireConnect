@@ -21,10 +21,10 @@ DireConnect is a portfolio full-stack customer and campaign management app. It u
 | Database, auth, and file storage | Supabase Free |
 | Email | Resend Node.js SDK |
 | Queue | BullMQ with a Redis-compatible service or local Redis |
-| Worker | Run locally for development/demo; no always-on free worker is assumed |
+| Worker | Runs beside the API in the same Render Free service |
 | Monitoring | Sentry |
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for account setup, environment variables, free-tier limits, and AWS cleanup steps. `render.yaml` describes the free Render API web service. The worker is intentionally not included in that deployment because Render's free web service sleeps when idle and a continuous background worker is not a free service type.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for account setup, environment variables, free-tier limits, and AWS cleanup steps. `render.yaml` describes the free Render web service, which runs the API and the campaign worker side by side. Render background workers are not free, so the worker sleeps with the API; see DEPLOYMENT.md for what that means for retries.
 
 ## Local development
 

@@ -5,8 +5,11 @@ services:
     plan: free
     region: oregon
     branch: main
-    buildCommand: npm ci --include=dev && npm run db:generate && npm run build:packages && npm run build -w apps/api
-    startCommand: npm run start -w apps/api
+    buildCommand: npm ci --include=dev && npm run db:generate && npm run build:packages && npm run build -w apps/api && npm run build -w apps/worker
+    # The campaign worker runs beside the API so it costs nothing extra. It restarts on its own if it
+    # crashes, so a worker problem (say, a missing Resend key) never takes the API down.
+    # shortcut: the worker sleeps with the free API, so delayed retries wait for the next wake; move it to a paid background worker if sends must retry on time.
+    startCommand: bash -c '(while true; do npm run start -w apps/worker; echo "Worker exited, restarting in 10s"; sleep 10; done) & exec npm run start -w apps/api'
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
@@ -28,4 +31,15 @@ services:
       - key: CLIENT_URL
         sync: false
       - key: KEEPALIVE_TOKEN
+        sync: false
+      # Worker settings (see docs/DEPLOYMENT.md, Resend email setup).
+      - key: APP_URL
+        sync: false
+      - key: MESSAGE_MODE
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        sync: false
+      - key: SENTRY_DSN
         sync: false
