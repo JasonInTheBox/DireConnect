@@ -7,6 +7,7 @@ import { readPreference, writePreference } from "@/lib/preferences";
 import { Dialog } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icons";
 import { Sidebar } from "./sidebar";
+import { BrandMark } from "@/components/ui/brand";
 
 const SIDEBAR_KEY = "dc.sidebar";
 
@@ -54,7 +55,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             <Icon name="menu" className="h-5 w-5" />
           </button>
-          <span className="text-sm font-semibold tracking-tight">DireConnect</span>
+          <BrandMark size="sm" />
         </header>
 
         <main id="main-content" tabIndex={-1} className="min-w-0 focus:outline-none">

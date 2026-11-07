@@ -23,7 +23,7 @@ export function DeliveryPanel({
   const rate = successRateLabel(messages);
 
   return (
-    <Panel id="delivery-heading" title="Delivery">
+    <Panel id="delivery-heading" title="Delivery" icon="check">
       {segments.length === 0 ? (
         <p className="mt-2 text-sm text-muted">{emptyText}</p>
       ) : (

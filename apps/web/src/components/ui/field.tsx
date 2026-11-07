@@ -66,7 +66,7 @@ export function TextField({
         id={fieldId}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy(fieldId, hint, error)}
-        className={cn(CONTROL, "h-10 lg:h-9", error ? "border-danger" : "border-line-strong", className)}
+        className={cn(CONTROL, "h-10", error ? "border-danger" : "border-line-strong", className)}
         {...props}
       />
     </FieldFrame>

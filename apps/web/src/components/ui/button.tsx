@@ -16,8 +16,8 @@ const VARIANTS: Record<Variant, string> = {
 };
 
 const SIZES: Record<Size, string> = {
-  md: "h-10 px-3.5 text-sm lg:h-9",
-  sm: "h-10 px-3 text-[13px] lg:h-9",
+  md: "h-10 px-3.5 text-sm",
+  sm: "h-10 px-3 text-[13px]",
 };
 
 /** Use on a `<Link>` that should look like a button. */

@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { buttonClasses } from "@/components/ui/button";
 import { notOptedInCount } from "@/lib/dashboard";
 import type { DashboardSummary } from "@/lib/types";
 import { Panel, PanelRow } from "@/components/ui/panel";
@@ -12,9 +11,9 @@ export function CustomersPanel({
   customers: DashboardSummary["customers"];
 }) {
   return (
-    <Panel id="customers-heading" title="Customers" className="flex flex-col">
+    <Panel id="customers-heading" title="Customers" icon="users" className="flex flex-col">
       <p className="mt-3">
-        <span className="text-3xl font-semibold tracking-tight text-ink">{customers.total}</span>{" "}
+        <span className="text-4xl font-semibold tracking-tight text-ink">{customers.total}</span>{" "}
         <span className="text-sm text-muted">{customers.total === 1 ? "customer" : "customers"}</span>
       </p>
 
@@ -25,9 +24,9 @@ export function CustomersPanel({
 
       <Link
         href={`/businesses/${businessId}/customers`}
-        className={buttonClasses({ variant: "ghost", className: "-ml-3.5 mt-4 self-start" })}
+        className="mt-5 inline-flex items-center gap-1 self-start font-medium text-accent hover:underline"
       >
-        View customers
+        View customers <span aria-hidden="true">→</span>
       </Link>
     </Panel>
   );

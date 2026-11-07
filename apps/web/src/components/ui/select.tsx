@@ -32,7 +32,7 @@ export function Select({
         <select
           id={selectId}
           className={cn(
-            "block h-10 w-full appearance-none rounded-control border border-line-strong bg-surface pl-3 pr-9 text-sm text-ink lg:h-9",
+            "block h-10 w-full appearance-none rounded-control border border-line-strong bg-surface pl-3 pr-9 text-sm text-ink",
             className,
           )}
           {...props}
