@@ -1,55 +1,62 @@
+/* Hallmark · custom · soft sky blue + coral (rewards only) · Plus Jakarta Sans · signature: the consent switches in the hero */
+/* critique: one soft light from above on every surface; blue acts, coral rewards */
+/* waive 54,67: the Coming next kicker is kept exactly as the owner asked */
+/* waive 26b: disabled states live in components/ui/button.tsx and field.tsx */
 @import "tailwindcss";
 
 /* Design tokens. Light is the default; dark follows the OS setting. */
 :root {
   color-scheme: light dark;
-  /* Sky blue for actions, coral for growth and rewards highlights. */
-  --canvas: #f4f8fd;
+  /* Soft sky blue for every action; coral only for loyalty and rewards. */
+  --canvas: #f3f7fb;
   --surface: #ffffff;
-  --sunken: #eaf1f9;
-  --line: #dce6f1;
-  --line-strong: #c3d1e2;
-  --ink: #0f1b2d;
-  --muted: #5b6b80;
-  --accent: #0b6fbf;
-  --accent-hover: #095ea3;
+  --sunken: #e8eff6;
+  --line: #dde5ee;
+  --line-strong: #c5d1de;
+  --ink: #1b2533;
+  --muted: #5a6878;
+  --accent: #2a70a8;
+  --accent-hover: #235f8f;
   --accent-ink: #ffffff;
-  --accent-soft: #e3f1fd;
-  --sky: #38bdf8;
-  --pop: #f2643d;
-  --pop-strong: #c2410c;
-  --pop-soft: #ffede6;
-  --success: #0f7a43;
-  --success-soft: #e3f6eb;
-  --warning: #9a6200;
-  --warning-soft: #fdf2d8;
-  --danger: #c62828;
-  --danger-soft: #fdeaea;
+  --accent-soft: #e6f0f8;
+  --sky: #a9d0ee;
+  --pop: #c2502e;
+  --pop-strong: #b4472a;
+  --pop-soft: #faebe4;
+  --success: #2f7a52;
+  --success-soft: #e5f3eb;
+  --warning: #8d6214;
+  --warning-soft: #f8f0dc;
+  --danger: #b8423b;
+  --danger-soft: #f9e8e6;
+  /* The loyalty card keeps one deep coral in both themes, so its white text stays legible. */
+  --reward: #c2410c;
+  --reward-deep: #9a3412;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --canvas: #0a1424;
-    --surface: #111d30;
-    --sunken: #08101d;
-    --line: #1e2c42;
-    --line-strong: #2e3f58;
-    --ink: #e8eef6;
-    --muted: #94a3b8;
-    --accent: #5bc0f8;
-    --accent-hover: #86d1fa;
-    --accent-ink: #04263d;
-    --accent-soft: #0e2a44;
-    --sky: #7dd3fc;
-    --pop: #ff8a65;
-    --pop-strong: #ff9e80;
-    --pop-soft: #3a1e15;
-    --success: #5bc58a;
-    --success-soft: #11291d;
-    --warning: #e8b54d;
-    --warning-soft: #2d2410;
-    --danger: #f28b82;
-    --danger-soft: #331717;
+    --canvas: #121a24;
+    --surface: #182230;
+    --sunken: #0f161f;
+    --line: #253244;
+    --line-strong: #34445a;
+    --ink: #e6edf5;
+    --muted: #9aa8b8;
+    --accent: #7cb8e6;
+    --accent-hover: #9cc9ec;
+    --accent-ink: #0d2235;
+    --accent-soft: #1c2a3b;
+    --sky: #3d6488;
+    --pop: #f08a68;
+    --pop-strong: #f4a084;
+    --pop-soft: #3a2420;
+    --success: #7cc79c;
+    --success-soft: #16291f;
+    --warning: #e2bb6a;
+    --warning-soft: #2b2414;
+    --danger: #ee9890;
+    --danger-soft: #331d1c;
   }
 }
 
@@ -67,6 +74,8 @@
   --color-accent-soft: var(--accent-soft);
   --color-sky: var(--sky);
   --color-pop: var(--pop);
+  --color-reward: var(--reward);
+  --color-reward-deep: var(--reward-deep);
   --color-pop-strong: var(--pop-strong);
   --color-pop-soft: var(--pop-soft);
   --color-success: var(--success);
@@ -76,14 +85,14 @@
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
 
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  --radius-control: 6px;
-  --radius-container: 10px;
+  --radius-control: 8px;
+  --radius-container: 14px;
 
-  --shadow-float: 0 12px 32px rgb(11 60 110 / 0.14), 0 2px 6px rgb(11 60 110 / 0.08);
-  --shadow-card: 0 1px 2px rgb(11 60 110 / 0.06), 0 4px 12px rgb(11 60 110 / 0.05);
+  --shadow-float: 0 16px 40px -12px rgb(27 52 82 / 0.18), 0 2px 6px rgb(27 52 82 / 0.06);
+  --shadow-card: 0 1px 2px rgb(27 52 82 / 0.05), 0 6px 16px -8px rgb(27 52 82 / 0.08);
 }
 
 @layer base {
@@ -99,6 +108,23 @@
     color: var(--ink);
     font-size: 0.875rem;
     line-height: 1.5;
+  }
+
+  html,
+  body {
+    overflow-x: clip;
+  }
+
+  /* Browser surfaces follow the palette too. */
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--ink);
+  }
+
+  html {
+    accent-color: var(--accent);
+    caret-color: var(--accent);
+    scrollbar-color: var(--line-strong) transparent;
   }
 
   :focus-visible {

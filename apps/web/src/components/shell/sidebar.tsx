@@ -31,7 +31,7 @@ function NavGroup({
       {collapsed ? (
         <div role="separator" className="mx-2 my-2 h-px bg-line" />
       ) : (
-        <p className="truncate px-2.5 pb-1 pt-3 text-xs font-medium text-muted">{heading}</p>
+        <p className="truncate px-2.5 pb-1.5 pt-4 text-xs font-semibold text-muted">{heading}</p>
       )}
       {entries.map((entry) => {
         const active = isNavActive(pathname, entry.href, entry.exact);
@@ -48,8 +48,8 @@ function NavGroup({
               "h-10",
               collapsed ? "justify-center" : "gap-2.5 px-2.5",
               active
-                ? "bg-accent-soft font-semibold text-accent before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-accent"
-                : "text-ink hover:bg-sunken",
+                ? "bg-surface font-semibold text-accent shadow-card"
+                : "text-ink/80 hover:bg-surface/70 hover:text-ink",
             )}
           >
             <Icon name={entry.icon} />
@@ -124,9 +124,17 @@ export function Sidebar({
 
       <div className={cn("space-y-1 border-t border-line p-3", collapsed && "px-2")}>
         {collapsed ? null : (
-          <p className="truncate px-2.5 pb-1 text-xs text-muted" title={user.email ?? undefined}>
-            {user.email ?? "Signed in"}
-          </p>
+          <div className="mb-2 flex items-center gap-2.5 rounded-control bg-surface px-2.5 py-2 shadow-card">
+            <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-semibold uppercase text-accent">
+              {(user.email ?? "?")[0]}
+            </span>
+            <span className="min-w-0">
+              <span className="block text-xs text-muted">Signed in as</span>
+              <span className="block truncate text-sm font-medium text-ink" title={user.email ?? undefined}>
+                {user.email ?? "Signed in"}
+              </span>
+            </span>
+          </div>
         )}
         <button
           type="button"
@@ -134,7 +142,7 @@ export function Sidebar({
           aria-label={collapsed ? "Log out" : undefined}
           title={collapsed ? "Log out" : undefined}
           className={cn(
-            "flex h-10 w-full items-center rounded-control text-sm font-medium text-ink transition-colors hover:bg-sunken",
+            "flex h-10 w-full items-center rounded-control text-sm font-medium text-ink transition-colors hover:bg-surface/70",
             collapsed ? "justify-center" : "gap-2.5 px-2.5",
           )}
         >
@@ -149,7 +157,7 @@ export function Sidebar({
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             className={cn(
-              "flex h-10 w-full items-center rounded-control text-sm font-medium text-muted transition-colors hover:bg-sunken hover:text-ink",
+              "flex h-10 w-full items-center rounded-control text-sm font-medium text-muted transition-colors hover:bg-surface/70 hover:text-ink",
               collapsed ? "justify-center" : "gap-2.5 px-2.5",
             )}
           >

@@ -28,7 +28,7 @@ export function CampaignsPanel({
         href={`/businesses/${businessId}/campaigns`}
         className="mt-5 inline-flex items-center gap-1 self-start font-medium text-accent hover:underline"
       >
-        View campaigns <span aria-hidden="true">→</span>
+        View campaigns
       </Link>
     </Panel>
   );

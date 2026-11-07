@@ -26,7 +26,7 @@ export function CustomersPanel({
         href={`/businesses/${businessId}/customers`}
         className="mt-5 inline-flex items-center gap-1 self-start font-medium text-accent hover:underline"
       >
-        View customers <span aria-hidden="true">→</span>
+        View customers
       </Link>
     </Panel>
   );

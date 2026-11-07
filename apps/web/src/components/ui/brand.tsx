@@ -7,7 +7,7 @@ export function BrandMark({ size = "md" }: { size?: "sm" | "md" }) {
     <span className="flex items-center gap-2.5 font-semibold tracking-tight text-ink">
       <span
         aria-hidden="true"
-        className={`flex ${tile} items-center justify-center rounded-[10px] bg-gradient-to-br from-sky to-accent text-white shadow-sm`}
+        className={`flex ${tile} items-center justify-center rounded-[10px] bg-accent text-accent-ink shadow-card`}
       >
         <Icon name="send" />
       </span>
