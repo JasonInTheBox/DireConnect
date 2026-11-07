@@ -20,25 +20,25 @@
     "@types/node": "^20.19.39",
     "nodemon": "^3.1.14",
     "prisma": "^7.7.0",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   },
   "dependencies": {
     "@direconnect/db": "*",
     "@direconnect/validation": "*",
     "@sentry/node": "^10.62.0",
-    "@supabase/supabase-js": "^2.108.2",
+    "@supabase/supabase-js": "^2.118.0",
     "bullmq": "^5.76.10",
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",
-    "express": "^5.2.1",
+    "express": "^5.3.0",
     "express-rate-limit": "^8.7.3",
     "helmet": "^8.3.0",
     "ioredis": "^5.10.1",
     "lodash.defaults": "^4.2.0",
     "lodash.isarguments": "^3.1.0",
     "lodash.isobject": "^3.0.2",
-    "msgpackr": "^2.0.2",
+    "msgpackr": "^2.1.4",
     "node-abort-controller": "^3.1.1"
   }
 }
