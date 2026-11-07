@@ -40,6 +40,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Blocks on critical advisories in shipped dependencies; Dependabot raises PRs for the rest.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=critical
+
       - name: Generate Prisma client
         run: npm run db:generate
 

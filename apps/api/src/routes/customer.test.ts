@@ -249,6 +249,7 @@ describe("customer routes", () => {
   );
 
   expect(mocks.customerFindFirst).toHaveBeenCalledWith({
+    omit: { unsubscribeToken: true },
     where: {
       id: "customer-1",
       businessId: "business-1",
@@ -333,4 +334,20 @@ it("DELETE /businesses/:businessId/customer/:customerId returns 404 when custome
   expect(response.body.error).toBe("Customer not found");
 });
 
+it("never sends the customer unsubscribe token to the client", async () => {
+    mocks.businessFindUnique.mockResolvedValue({ id: "business-1", ownerId: "user-1" });
+    mocks.customerFindMany.mockResolvedValue([]);
+    mocks.customerCreate.mockResolvedValue({ id: "customer-1" });
+    mocks.customerUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.customerFindFirst.mockResolvedValue({ id: "customer-1" });
+    const app = createTestApp();
+
+    await request(app).get("/businesses/business-1/customer");
+    await request(app).post("/businesses/business-1/customer").send({ firstName: "Alice", emailOptIn: false });
+    await request(app).put("/businesses/business-1/customer/customer-1").send({ firstName: "Alice", emailOptIn: false });
+
+    for (const query of [mocks.customerFindMany, mocks.customerCreate, mocks.customerFindFirst]) {
+      expect(query).toHaveBeenCalledWith(expect.objectContaining({ omit: { unsubscribeToken: true } }));
+    }
+  });
 });

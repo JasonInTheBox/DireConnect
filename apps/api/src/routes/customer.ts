@@ -6,6 +6,9 @@ import { requireAuth } from "../middleware/requireAuth.js";
 import crypto from "crypto";
 import type { AuthenticatedRequest } from "../middleware/requireAuth.js";
 
+// The unsubscribe token is a secret link for the customer; the owner never needs it.
+const PRIVATE_FIELDS = { unsubscribeToken: true } as const;
+
 function getParam(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
@@ -44,6 +47,7 @@ export function createCustomerRouter(
       }
 
       const customers = await db.customer.findMany({
+        omit: PRIVATE_FIELDS,
         where: {
           businessId,
           ownerId: req.user!.id,
@@ -95,6 +99,7 @@ export function createCustomerRouter(
           unsubscribedAt: isSubscribedToAnyChannel ? null : new Date(),
           unsubscribeToken: crypto.randomUUID(),
         },
+        omit: PRIVATE_FIELDS,
       });
 
       res.status(201).json(customer);
@@ -152,6 +157,7 @@ export function createCustomerRouter(
       }
 
       const updatedCustomer = await db.customer.findFirst({
+        omit: PRIVATE_FIELDS,
         where: {
           id: customerId,
           businessId,
