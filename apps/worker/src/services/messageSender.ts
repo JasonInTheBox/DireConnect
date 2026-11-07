@@ -11,6 +11,7 @@ export type SendMessageInput = {
   message: string;
   htmlMessage?: string;
   idempotencyKey?: string;
+  unsubscribeLink?: string;
 };
 
 export type SendMessageResult = {
@@ -66,6 +67,15 @@ export function createResendEmailSender({
           subject: input.subject ?? "Promotion",
           text: input.message,
           ...(input.htmlMessage ? { html: input.htmlMessage } : {}),
+          // Inbox one-click unsubscribe (RFC 8058); Gmail and Yahoo expect it from bulk senders.
+          ...(input.unsubscribeLink
+            ? {
+                headers: {
+                  "List-Unsubscribe": `<${input.unsubscribeLink}>`,
+                  "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                },
+              }
+            : {}),
         },
         requestOptions,
       );

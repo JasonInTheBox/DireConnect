@@ -352,6 +352,7 @@ export async function processCampaignJob(
       message: messageWithUnsubscribe,
       idempotencyKey: `campaign-${campaign.id}-customer-${snapshot.customerId}-recipient-${currentCustomer.email}`,
       ...(htmlMessage ? { htmlMessage } : {}),
+      ...(unsubscribeLink ? { unsubscribeLink } : {}),
     });
 
     if (!sendResult.success && sendResult.retryable) {
