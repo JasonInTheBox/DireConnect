@@ -27,3 +27,5 @@ services:
         sync: false
       - key: CLIENT_URL
         sync: false
+      - key: KEEPALIVE_TOKEN
+        sync: false

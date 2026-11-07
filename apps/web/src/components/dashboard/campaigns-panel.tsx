@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { CampaignStatusBadge } from "@/components/campaigns/status-badge";
-import { buttonClasses } from "@/components/ui/button";
 import type { DashboardSummary } from "@/lib/types";
 import { Panel, PanelRow } from "@/components/ui/panel";
 
@@ -12,9 +11,9 @@ export function CampaignsPanel({
   campaigns: DashboardSummary["campaigns"];
 }) {
   return (
-    <Panel id="campaigns-heading" title="Campaigns" className="flex flex-col">
+    <Panel id="campaigns-heading" title="Campaigns" icon="send" className="flex flex-col">
       <p className="mt-3">
-        <span className="text-3xl font-semibold tracking-tight text-ink">{campaigns.total}</span>{" "}
+        <span className="text-4xl font-semibold tracking-tight text-ink">{campaigns.total}</span>{" "}
         <span className="text-sm text-muted">{campaigns.total === 1 ? "campaign" : "campaigns"}</span>
       </p>
 
@@ -27,7 +26,7 @@ export function CampaignsPanel({
 
       <Link
         href={`/businesses/${businessId}/campaigns`}
-        className={buttonClasses({ variant: "ghost", className: "-ml-3.5 mt-4 self-start" })}
+        className="mt-5 inline-flex items-center gap-1 self-start font-medium text-accent hover:underline"
       >
         View campaigns
       </Link>

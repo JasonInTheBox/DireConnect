@@ -1,46 +1,64 @@
+/* Hallmark · custom · soft sky blue + coral (rewards only) · Plus Jakarta Sans · signature: the consent switches in the hero */
+/* critique: one soft light from above on every surface; blue acts, coral rewards */
+/* waive 54,67: the Coming next kicker is kept exactly as the owner asked */
+/* waive 26b: disabled states live in components/ui/button.tsx and field.tsx */
 @import "tailwindcss";
 
 /* Design tokens. Light is the default; dark follows the OS setting. */
 :root {
   color-scheme: light dark;
-  --canvas: #f6f7f8;
+  /* Soft sky blue for every action; coral only for loyalty and rewards. */
+  --canvas: #f3f7fb;
   --surface: #ffffff;
-  --sunken: #eef0f2;
-  --line: #e3e6ea;
-  --line-strong: #cbd1d8;
-  --ink: #14181f;
-  --muted: #5b6572;
-  --accent: #0b6e73;
-  --accent-hover: #095a5e;
+  --sunken: #e8eff6;
+  --line: #dde5ee;
+  --line-strong: #c5d1de;
+  --ink: #1b2533;
+  --muted: #5a6878;
+  --accent: #2a70a8;
+  --accent-hover: #235f8f;
   --accent-ink: #ffffff;
-  --accent-soft: #e2f1f1;
-  --success: #17703f;
-  --success-soft: #e4f4eb;
-  --warning: #8a5b00;
-  --warning-soft: #fbf1d9;
-  --danger: #c02a2a;
-  --danger-soft: #fbe7e7;
+  --accent-soft: #e6f0f8;
+  --sky: #a9d0ee;
+  --pop: #c2502e;
+  --pop-strong: #b4472a;
+  --pop-soft: #faebe4;
+  --success: #2f7a52;
+  --success-soft: #e5f3eb;
+  --warning: #8d6214;
+  --warning-soft: #f8f0dc;
+  --danger: #b8423b;
+  --danger-soft: #f9e8e6;
+  /* The loyalty card keeps one deep coral in both themes, so its white text stays legible. */
+  --reward: #c2410c;
+  --reward-deep: #9a3412;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --canvas: #0e1113;
-    --surface: #15191c;
-    --sunken: #0b0d0f;
-    --line: #262c31;
-    --line-strong: #3a424a;
-    --ink: #e8ebed;
-    --muted: #98a2ab;
-    --accent: #4db6bc;
-    --accent-hover: #6cc7cc;
-    --accent-ink: #06292b;
-    --accent-soft: #12292b;
-    --success: #5bc58a;
-    --success-soft: #12281c;
-    --warning: #e0b04a;
-    --warning-soft: #2b2310;
-    --danger: #f08080;
-    --danger-soft: #2e1616;
+    --canvas: #121a24;
+    --surface: #182230;
+    --sunken: #0f161f;
+    --line: #253244;
+    --line-strong: #34445a;
+    --ink: #e6edf5;
+    --muted: #9aa8b8;
+    --accent: #7cb8e6;
+    --accent-hover: #9cc9ec;
+    --accent-ink: #0d2235;
+    --accent-soft: #1c2a3b;
+    --sky: #3d6488;
+    --pop: #f08a68;
+    --pop-strong: #f4a084;
+    --pop-soft: #3a2420;
+    --success: #7cc79c;
+    --success-soft: #16291f;
+    --warning: #e2bb6a;
+    --warning-soft: #2b2414;
+    --danger: #ee9890;
+    --danger-soft: #331d1c;
+    --reward: #c2410c;
+    --reward-deep: #9a3412;
   }
 }
 
@@ -56,6 +74,12 @@
   --color-accent-hover: var(--accent-hover);
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
+  --color-sky: var(--sky);
+  --color-pop: var(--pop);
+  --color-reward: var(--reward);
+  --color-reward-deep: var(--reward-deep);
+  --color-pop-strong: var(--pop-strong);
+  --color-pop-soft: var(--pop-soft);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);
@@ -63,26 +87,57 @@
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
 
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  --radius-control: 6px;
-  --radius-container: 10px;
+  --radius-control: 8px;
+  --radius-container: 14px;
 
-  --shadow-float: 0 8px 24px rgb(20 24 31 / 0.14), 0 1px 3px rgb(20 24 31 / 0.1);
+  --shadow-float: 0 16px 40px -12px rgb(27 52 82 / 0.18), 0 2px 6px rgb(27 52 82 / 0.06);
+  --shadow-card: 0 1px 2px rgb(27 52 82 / 0.05), 0 6px 16px -8px rgb(27 52 82 / 0.08);
 }
 
 @layer base {
+  /* Desktop gets a larger rem, so text, controls and spacing all scale together. */
+  @media (min-width: 1024px) {
+    html {
+      font-size: 106.25%;
+    }
+  }
+
   body {
     background: var(--canvas);
     color: var(--ink);
-    font-size: 14px;
+    font-size: 0.875rem;
     line-height: 1.5;
+  }
+
+  html,
+  body {
+    overflow-x: clip;
+  }
+
+  /* Browser surfaces follow the palette too. */
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--ink);
+  }
+
+  html {
+    accent-color: var(--accent);
+    caret-color: var(--accent);
+    scrollbar-color: var(--line-strong) transparent;
   }
 
   :focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
   }
 }
 
@@ -114,6 +169,26 @@ dialog.drawer[open] {
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* Landing page loops; the reduced-motion rule above stops them. */
+@keyframes float {
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
   }
 }
 

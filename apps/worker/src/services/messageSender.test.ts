@@ -64,6 +64,22 @@ describe("Resend email adapter", () => {
     expect(key).not.toContain("customer-1");
   });
 
+  it("adds one-click unsubscribe headers when the email has an unsubscribe link", async () => {
+    const send = vi.fn().mockResolvedValue({ data: { id: "resend-email-2" }, error: null, headers: {} });
+    const sendEmail = createResendEmailSender({
+      apiKey: "test-api-key",
+      fromEmail: "promotions@direconnect.app",
+      client: createClient(send),
+    });
+
+    await sendEmail({ ...emailInput, unsubscribeLink: "https://api.example.com/api/unsubscribe/token-1" });
+
+    expect(send.mock.calls[0][0].headers).toEqual({
+      "List-Unsubscribe": "<https://api.example.com/api/unsubscribe/token-1>",
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    });
+  });
+
   it("returns a retryable result for rate limits and preserves Retry-After", async () => {
     const send = vi.fn().mockResolvedValue({
       data: null,

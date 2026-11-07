@@ -1,0 +1,90 @@
+# Keep-alive ping for the free-tier services.
+#
+# Why this exists: Supabase pauses free projects, and free Redis databases are
+# archived, after a period without activity. Once a day this workflow calls
+# GET /api/keepalive on the deployed API, which runs a real database read
+# of one table row, a real Redis write (a key with an expiry) and a real request to
+# Supabase Auth. As a side effect it also wakes the API on Render's free tier.
+#
+# Settings to add in the repository (Settings > Secrets and variables > Actions):
+#   - Secret   KEEPALIVE_TOKEN    the same value as KEEPALIVE_TOKEN on the API
+#   - Variable KEEPALIVE_API_URL  the API origin, for example https://api.example.com
+#                                 (no trailing slash, no path)
+#
+# Things to know:
+#   - Scheduled workflows run only from the default branch.
+#   - GitHub disables scheduled workflows after 60 days without repository
+#     activity. If that happens, re-enable the workflow in the Actions tab.
+#   - A failed run emails the repository owner. Open the run log: the JSON
+#     response lists which check (database, redis, supabase) failed.
+#   - The Render free API can take about a minute to cold start, so each attempt
+#     waits up to 2 minutes and the request is retried 5 times, 30 seconds apart.
+#     Answers such as 401 (wrong secret) or 404 (token not set on the API) come
+#     back immediately, so a wrong secret costs roughly 2.5 minutes of retries.
+#   - Only https:// URLs are accepted (curl is also limited to https), because the
+#     token is sent in a header. The run succeeds only when the API answers HTTP
+#     200 with "status":"ok"; any other answer, including a redirect, fails it.
+#   - The token is only passed through the environment. Never add `set -x` or
+#     print it.
+
+name: Keep services awake
+
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    name: Ping the API
+    runs-on: ubuntu-latest
+    # Worst case (the API hangs on every attempt): 6 x 120 s + 5 x 30 s = 14.5 minutes.
+    timeout-minutes: 20
+    env:
+      KEEPALIVE_TOKEN: ${{ secrets.KEEPALIVE_TOKEN }}
+      KEEPALIVE_API_URL: ${{ vars.KEEPALIVE_API_URL }}
+
+    steps:
+      - name: Check configuration
+        run: |
+          if [ -z "${KEEPALIVE_TOKEN}" ]; then
+            echo "::error::The KEEPALIVE_TOKEN repository secret is not set. Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          if [ -z "${KEEPALIVE_API_URL}" ]; then
+            echo "::error::The KEEPALIVE_API_URL repository variable is not set. Add the API origin, for example https://api.example.com."
+            exit 1
+          fi
+          case "${KEEPALIVE_API_URL}" in
+            https://*) ;;
+            *)
+              echo "::error::KEEPALIVE_API_URL must start with https:// because the token is sent in a header."
+              exit 1
+              ;;
+          esac
+
+      - name: Ping
+        run: |
+          body="$(mktemp)"
+          rc=0
+          code="$(curl --silent --show-error --fail-with-body --proto '=https' \
+            --retry 5 --retry-delay 30 --retry-all-errors --max-time 120 \
+            --output "${body}" --write-out '%{http_code}' \
+            --header "Authorization: Bearer ${KEEPALIVE_TOKEN}" \
+            "${KEEPALIVE_API_URL%/}/api/keepalive")" || rc=$?
+
+          echo "curl exit code: ${rc}, HTTP status: ${code:-none}"
+          if [ -s "${body}" ]; then
+            head -c 4000 "${body}"
+            echo
+          fi
+
+          if [ "${code}" = "200" ] && grep -q '"status":"ok"' "${body}"; then
+            echo "Keep-alive succeeded: database, Redis and Supabase all answered."
+            exit 0
+          fi
+
+          echo "::error::The keep-alive check failed (HTTP status ${code:-none}, curl exit code ${rc}). See the response above: 401 means the secrets differ, 404 means KEEPALIVE_TOKEN is not set on the API, 503 means a check failed."
+          exit 1

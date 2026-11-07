@@ -13,7 +13,7 @@ export function RecentCampaigns({
   campaigns: DashboardCampaign[];
 }) {
   return (
-    <Panel id="recent-heading" title="Recent campaigns">
+    <Panel id="recent-heading" title="Recent campaigns" icon="clock">
       {campaigns.length === 0 ? (
         <p className="mt-2 text-sm text-muted">
           No campaigns yet. Your latest campaigns will show up here.

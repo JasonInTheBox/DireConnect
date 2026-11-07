@@ -43,7 +43,7 @@ export function CustomersToolbar({
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder="Search by name, email or phone"
-            className="block h-10 w-full rounded-control border border-line-strong bg-surface pl-9 pr-3 text-sm text-ink placeholder:text-muted lg:h-9"
+            className="block h-10 w-full rounded-control border border-line-strong bg-surface pl-9 pr-3 text-sm text-ink placeholder:text-muted"
           />
         </div>
         <div className="sm:w-56">

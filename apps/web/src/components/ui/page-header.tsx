@@ -50,9 +50,9 @@ export function PageHeader({
           <h1
             id="page-title"
             tabIndex={-1}
-            className="break-words text-xl font-semibold tracking-tight text-ink [overflow-wrap:anywhere] focus:outline-none"
+            className="break-words text-2xl font-semibold sm:text-3xl tracking-tight text-ink [overflow-wrap:anywhere] focus:outline-none"
           >{title}</h1>
-          {description ? <p className="mt-1 max-w-prose text-sm text-muted">{description}</p> : null}
+          {description ? <p className="mt-1.5 max-w-prose text-base text-muted">{description}</p> : null}
         </div>
         {actions ? <div className="flex max-w-full flex-wrap items-center gap-2">{actions}</div> : null}
       </div>

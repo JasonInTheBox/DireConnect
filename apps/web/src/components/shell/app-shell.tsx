@@ -7,6 +7,7 @@ import { readPreference, writePreference } from "@/lib/preferences";
 import { Dialog } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icons";
 import { Sidebar } from "./sidebar";
+import { BrandMark } from "@/components/ui/brand";
 
 const SIDEBAR_KEY = "dc.sidebar";
 
@@ -37,7 +38,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <aside
         className={cn(
-          "sticky top-0 z-20 hidden h-screen shrink-0 border-r border-line bg-surface transition-[width] duration-150 lg:block",
+          "sticky top-0 z-20 hidden h-screen shrink-0 border-r border-line bg-sunken transition-[width] duration-150 lg:block",
           collapsed ? "w-16" : "w-64",
         )}
       >
@@ -45,7 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-line bg-surface px-3 lg:hidden">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-line bg-surface/90 px-3 backdrop-blur lg:hidden">
           <button
             type="button"
             aria-label="Open navigation"
@@ -54,7 +55,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             <Icon name="menu" className="h-5 w-5" />
           </button>
-          <span className="text-sm font-semibold tracking-tight">DireConnect</span>
+          <BrandMark size="sm" />
         </header>
 
         <main id="main-content" tabIndex={-1} className="min-w-0 focus:outline-none">

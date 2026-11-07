@@ -95,10 +95,10 @@ export function Dialog({
         }
       }}
       className={cn(
-        "bg-surface p-0 text-ink shadow-float backdrop:bg-black/50",
+        "p-0 text-ink shadow-float backdrop:bg-black/50",
         isDrawer
-          ? "drawer m-0 mr-auto h-dvh max-h-none w-72 max-w-[85vw] overflow-visible border-r border-line"
-          : "m-auto w-[calc(100%-2rem)] max-w-md rounded-container border border-line",
+          ? "drawer m-0 mr-auto bg-sunken h-dvh max-h-none w-72 max-w-[85vw] overflow-visible border-r border-line"
+          : "m-auto w-[calc(100%-2rem)] max-w-md rounded-container bg-surface border border-line",
       )}
     >
       {open ? (
