@@ -15,6 +15,7 @@ const existing: Customer = {
   lastName: "Hopper",
   email: "grace@navy.test",
   phone: null,
+  notes: "Likes rye bread",
   emailOptIn: false,
   smsOptIn: true,
   unsubscribedAt: "2026-09-01T00:00:00Z",
@@ -27,6 +28,7 @@ describe("customerFormValues", () => {
       lastName: "",
       email: "",
       phone: "",
+      notes: "",
       emailOptIn: false,
     });
   });
@@ -37,6 +39,7 @@ describe("customerFormValues", () => {
       lastName: "Hopper",
       email: "grace@navy.test",
       phone: "",
+      notes: "Likes rye bread",
       emailOptIn: false,
     });
   });
@@ -78,6 +81,7 @@ describe("customerPayload", () => {
     lastName: " Johnson ",
     email: " kj@nasa.test ",
     phone: " 555-0100 ",
+    notes: "  Birthday in May ",
     emailOptIn: true,
   };
 
@@ -87,6 +91,7 @@ describe("customerPayload", () => {
       lastName: "Johnson",
       email: "kj@nasa.test",
       phone: "555-0100",
+      notes: "Birthday in May",
       emailOptIn: true,
       smsOptIn: false,
     });

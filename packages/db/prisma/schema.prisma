@@ -23,6 +23,8 @@ model Customer {
   lastName   String?
   email      String?
   phone      String?
+  /// Private to the business owner; never sent to the customer.
+  notes      String?
 
   emailOptIn Boolean  @default(false)
   smsOptIn   Boolean  @default(false)

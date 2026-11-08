@@ -4,7 +4,6 @@ import Link from "next/link";
 import { Monogram } from "@/components/shell/monogram";
 import { buttonClasses } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
-import { Menu } from "@/components/ui/menu";
 import type { Business } from "@/lib/types";
 
 export function BusinessCard({
@@ -32,23 +31,6 @@ export function BusinessCard({
             {business.description || "No description yet."}
           </p>
         </div>
-        <Menu
-          align="end"
-          items={[
-            { id: "edit", label: "Edit", icon: <Icon name="edit" />, onSelect: onEdit },
-            { id: "delete", label: "Delete", icon: <Icon name="trash" />, onSelect: onDelete },
-          ]}
-          trigger={(triggerProps) => (
-            <button
-              {...triggerProps}
-              type="button"
-              aria-label={`Actions for ${business.name}`}
-              className="-mr-2 -mt-1 flex min-h-10 min-w-10 items-center justify-center rounded-control text-muted transition-colors hover:bg-sunken hover:text-ink lg:min-h-9 lg:min-w-9"
-            >
-              <Icon name="more" />
-            </button>
-          )}
-        />
       </div>
 
       {contact.length > 0 ? (
@@ -61,14 +43,32 @@ export function BusinessCard({
         </ul>
       ) : null}
 
-      <div className="mt-5">
+      {/* Pinned to the bottom so every card in a row lines its buttons up. */}
+      <div className="mt-auto flex items-center gap-2 pt-5">
         <Link
           href={`/businesses/${business.id}/dashboard`}
           aria-label={`Open ${business.name}`}
-          className={buttonClasses({ variant: "secondary" })}
+          className={buttonClasses({ variant: "primary" })}
         >
           Open
         </Link>
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label={`Edit ${business.name}`}
+          className={buttonClasses({ variant: "secondary" })}
+        >
+          <Icon name="edit" /> Edit
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          aria-label={`Delete ${business.name}`}
+          title="Delete"
+          className={buttonClasses({ variant: "ghost", className: "ml-auto w-10 px-0 text-muted hover:text-danger" })}
+        >
+          <Icon name="trash" />
+        </button>
       </div>
     </li>
   );

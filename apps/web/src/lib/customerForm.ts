@@ -6,6 +6,7 @@ export type CustomerFormValues = {
   lastName: string;
   email: string;
   phone: string;
+  notes: string;
   emailOptIn: boolean;
 };
 
@@ -15,6 +16,7 @@ export function customerFormValues(customer?: Customer | null): CustomerFormValu
     lastName: customer?.lastName ?? "",
     email: customer?.email ?? "",
     phone: customer?.phone ?? "",
+    notes: customer?.notes ?? "",
     emailOptIn: customer ? emailConsentOf(customer) === "opted-in" : false,
   };
 }
@@ -36,6 +38,7 @@ export function customerPayload(
     lastName: values.lastName.trim(),
     email: values.email.trim(),
     phone: values.phone.trim(),
+    notes: values.notes.trim(),
     emailOptIn: values.emailOptIn,
     smsOptIn: existing?.smsOptIn ?? false,
   };

@@ -1,18 +1,80 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { cn } from "@/lib/cn";
 import { THEME_KEY } from "@/lib/theme";
 import { Icon } from "./icons";
 
 type Theme = "light" | "dark";
+export type ThemePreference = Theme | "system";
+
+const CHANGE_EVENT = "direconnect-theme-change";
+
+function systemTheme(): Theme {
+  return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
 
 function currentTheme(): Theme {
   return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 }
 
-function apply(theme: Theme) {
-  document.documentElement.dataset.theme = theme;
+function readPreference(): ThemePreference {
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === "light" || saved === "dark") return saved;
+  } catch {}
+  return "system";
+}
+
+/** The saved choice, kept in sync across every toggle and the settings page. */
+export function useThemePreference(): ThemePreference | null {
+  return useSyncExternalStore(
+    (onChange) => {
+      window.addEventListener(CHANGE_EVENT, onChange);
+      window.addEventListener("storage", onChange);
+      return () => {
+        window.removeEventListener(CHANGE_EVENT, onChange);
+        window.removeEventListener("storage", onChange);
+      };
+    },
+    readPreference,
+    () => null,
+  );
+}
+
+/**
+ * Saves the preference and applies it. With an origin, the new theme grows as a circle from
+ * that point; reduced motion and browsers without view transitions switch instantly.
+ */
+export function setThemePreference(preference: ThemePreference, origin?: { x: number; y: number }) {
+  try {
+    if (preference === "system") localStorage.removeItem(THEME_KEY);
+    else localStorage.setItem(THEME_KEY, preference);
+  } catch {}
+
+  const next = preference === "system" ? systemTheme() : preference;
+  const apply = () => {
+    document.documentElement.dataset.theme = next;
+    window.dispatchEvent(new Event(CHANGE_EVENT));
+  };
+
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (next === currentTheme() || reduced || !document.startViewTransition) {
+    apply();
+    return;
+  }
+
+  const { x, y } = origin ?? { x: innerWidth / 2, y: innerHeight / 2 };
+  const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+  const transition = document.startViewTransition(apply);
+  transition.ready
+    .then(() => {
+      document.documentElement.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+        { duration: 1100, easing: "cubic-bezier(0.2, 0, 0, 1)", pseudoElement: "::view-transition-new(root)" },
+      );
+    })
+    .catch(() => undefined);
 }
 
 /** Switches light and dark with a circle that grows from the button. */
@@ -21,55 +83,25 @@ export function ThemeToggle({ showLabel = false, className }: { showLabel?: bool
   const [theme, setTheme] = useState<Theme | null>(null);
 
   useEffect(() => {
-    setTheme(currentTheme());
+    const sync = () => setTheme(currentTheme());
+    sync();
+    window.addEventListener(CHANGE_EVENT, sync);
 
     // Follow the OS while the visitor has not chosen.
     const media = matchMedia("(prefers-color-scheme: dark)");
-    const follow = (event: MediaQueryListEvent) => {
-      let saved: string | null = null;
-      try {
-        saved = localStorage.getItem(THEME_KEY);
-      } catch {}
-      if (saved) return;
-      const next: Theme = event.matches ? "dark" : "light";
-      apply(next);
-      setTheme(next);
+    const follow = () => {
+      if (readPreference() === "system") setThemePreference("system");
     };
     media.addEventListener("change", follow);
-    return () => media.removeEventListener("change", follow);
+    return () => {
+      window.removeEventListener(CHANGE_EVENT, sync);
+      media.removeEventListener("change", follow);
+    };
   }, []);
 
   function toggle(event: React.MouseEvent<HTMLButtonElement>) {
-    const next: Theme = currentTheme() === "dark" ? "light" : "dark";
-    try {
-      localStorage.setItem(THEME_KEY, next);
-    } catch {}
-
-    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduced || !document.startViewTransition) {
-      apply(next);
-      setTheme(next);
-      return;
-    }
-
-    // The new theme is revealed as a circle from the button's centre out to the farthest corner.
     const { left, top, width, height } = event.currentTarget.getBoundingClientRect();
-    const x = left + width / 2;
-    const y = top + height / 2;
-    const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
-
-    const transition = document.startViewTransition(() => {
-      apply(next);
-      setTheme(next);
-    });
-    transition.ready
-      .then(() => {
-        document.documentElement.animate(
-          { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
-          { duration: 1100, easing: "cubic-bezier(0.2, 0, 0, 1)", pseudoElement: "::view-transition-new(root)" },
-        );
-      })
-      .catch(() => undefined);
+    setThemePreference(currentTheme() === "dark" ? "light" : "dark", { x: left + width / 2, y: top + height / 2 });
   }
 
   const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
