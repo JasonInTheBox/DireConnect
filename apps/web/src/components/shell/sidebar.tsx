@@ -10,6 +10,7 @@ import { BusinessSwitcher } from "./business-switcher";
 import { useSession } from "./session-provider";
 import { useLogout } from "./use-logout";
 import { BrandMark } from "@/components/ui/brand";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 type NavEntry = { href: string; label: string; icon: IconName; exact?: boolean };
 
@@ -136,6 +137,7 @@ export function Sidebar({
             </span>
           </div>
         )}
+        <ThemeToggle showLabel={!collapsed} className="hover:bg-surface/70" />
         <button
           type="button"
           onClick={handleLogout}

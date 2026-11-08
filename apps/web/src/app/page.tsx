@@ -5,6 +5,7 @@ import { MobileNav, NavAuthLinks, RedirectIfSignedIn } from "@/components/landin
 import { BrandMark } from "@/components/ui/brand";
 import { buttonClasses } from "@/components/ui/button";
 import { Icon, type IconName } from "@/components/ui/icons";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { CAMPAIGN_LIMITS } from "@/lib/campaignLimits";
 import { pageTitle } from "@/lib/pageTitle";
 import { INVITE_EMAIL, INVITE_MAILTO } from "@/lib/signupStatus";
@@ -136,6 +137,7 @@ export default function Home() {
             ))}
           </nav>
           <div className="flex items-center gap-1">
+            <ThemeToggle />
             <NavAuthLinks />
             <MobileNav links={NAV} />
           </div>

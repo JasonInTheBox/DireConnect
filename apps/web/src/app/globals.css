@@ -4,9 +4,12 @@
 /* waive 26b: disabled states live in components/ui/button.tsx and field.tsx */
 @import "tailwindcss";
 
-/* Design tokens. Light is the default; dark follows the OS setting. */
+/* The theme is chosen by data-theme on <html> (set before paint from the saved choice or the OS). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Design tokens. Light is the default; dark applies when <html data-theme="dark">. */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   /* Paper and navy ink for everything you read and press; stamp red (pop) only on post objects. */
   --canvas: #f6f1e7;
   --surface: #fffdf8;
@@ -35,34 +38,33 @@
   --reward-deep: #7f2716;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* A letter read by lamplight: navy paper, cream ink, the same stamp red. */
-    --canvas: #141925;
-    --surface: #1b2130;
-    --sunken: #10141d;
-    --line: #283044;
-    --line-strong: #384259;
-    --ink: #efe8d8;
-    --muted: #a8aebb;
-    --accent: #efe8d8;
-    --accent-hover: #fbf6ea;
-    --accent-ink: #1f2a44;
-    --accent-soft: #252d40;
-    --sky: #2e3850;
-    --pop: #c2452d;
-    --pop-strong: #ec8a73;
-    --pop-ink: #fffdf8;
-    --pop-soft: #3a2320;
-    --success: #7cc79c;
-    --success-soft: #16291f;
-    --warning: #e2bb6a;
-    --warning-soft: #2b2414;
-    --danger: #f0959b;
-    --danger-soft: #35191d;
-    --reward: #b63a24;
-    --reward-deep: #7f2716;
-  }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  /* A letter read by lamplight: navy paper, cream ink, the same stamp red. */
+  --canvas: #141925;
+  --surface: #1b2130;
+  --sunken: #10141d;
+  --line: #283044;
+  --line-strong: #384259;
+  --ink: #efe8d8;
+  --muted: #a8aebb;
+  --accent: #efe8d8;
+  --accent-hover: #fbf6ea;
+  --accent-ink: #1f2a44;
+  --accent-soft: #252d40;
+  --sky: #2e3850;
+  --pop: #c2452d;
+  --pop-strong: #ec8a73;
+  --pop-ink: #fffdf8;
+  --pop-soft: #3a2320;
+  --success: #7cc79c;
+  --success-soft: #16291f;
+  --warning: #e2bb6a;
+  --warning-soft: #2b2414;
+  --danger: #f0959b;
+  --danger-soft: #35191d;
+  --reward: #b63a24;
+  --reward-deep: #7f2716;
 }
 
 @theme inline {
@@ -251,20 +253,25 @@ dialog.drawer[open] {
     }
   }
 
-  @media (prefers-color-scheme: dark) {
-    .paper-hero {
-      background-image: url("/postmark/hero-dark.svg");
-    }
+  [data-theme="dark"] .paper-hero {
+    background-image: url("/postmark/hero-dark.svg");
+  }
 
-    .paper-auth {
-      background-image: url("/postmark/auth-dark.svg");
-    }
+  [data-theme="dark"] .paper-auth {
+    background-image: url("/postmark/auth-dark.svg");
+  }
 
-    @media (max-width: 1023px) {
-      .paper-hero,
-      .paper-auth {
-        background-image: url("/postmark/phone-dark.svg");
-      }
+  @media (max-width: 1023px) {
+    [data-theme="dark"] :is(.paper-hero, .paper-auth) {
+      background-image: url("/postmark/phone-dark.svg");
     }
   }
 }
+
+/* Theme switch: the new theme grows as a circle from the toggle (theme-toggle.tsx drives the clip). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
