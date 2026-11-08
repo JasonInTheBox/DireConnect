@@ -4,12 +4,12 @@ import { useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { readPreference, writePreference } from "@/lib/preferences";
+import { SIDEBAR_KEY } from "@/lib/theme";
 import { Dialog } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icons";
 import { Sidebar } from "./sidebar";
 import { BrandMark } from "@/components/ui/brand";
 
-const SIDEBAR_KEY = "dc.sidebar";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -25,6 +25,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     const next = !collapsed;
     setCollapsed(next);
     writePreference(SIDEBAR_KEY, next ? "collapsed" : "expanded");
+    // Keeps the reload skeleton (shell-skeleton.tsx) the same width as the real sidebar.
+    if (next) document.documentElement.dataset.sidebar = "collapsed";
+    else delete document.documentElement.dataset.sidebar;
   }
 
   return (
