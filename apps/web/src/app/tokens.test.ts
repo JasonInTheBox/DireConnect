@@ -54,6 +54,9 @@ const textPairs: Array<[string, string]> = [
   ["warning", "surface"],
   ["danger", "danger-soft"],
   ["danger", "surface"],
+  ["pop-ink", "pop"],
+  ["pop-strong", "canvas"],
+  ["pop-strong", "surface"],
 ];
 
 describe("design tokens", () => {

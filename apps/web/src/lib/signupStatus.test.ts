@@ -39,7 +39,7 @@ describe("isSignupDisabledError", () => {
 
 describe("copy", () => {
   it("explains that the project is non-commercial", () => {
-    expect(SIGNUP_CLOSED_TITLE).toBe("Sign-up is closed");
+    expect(SIGNUP_CLOSED_TITLE).toBe("Accounts are by invitation");
     expect(SIGNUP_CLOSED_TEXT).toContain("non-commercial");
   });
 });

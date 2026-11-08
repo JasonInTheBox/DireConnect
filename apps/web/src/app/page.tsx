@@ -1,38 +1,32 @@
 import Link from "next/link";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { AudienceDemo, LoyaltyDemo, StepsShowcase } from "@/components/landing/landing-demos";
-import {
-  LandingSignupNotice,
-  NavAuthLinks,
-  RedirectIfSignedIn,
-} from "@/components/landing/landing-islands";
+import { MobileNav, NavAuthLinks, RedirectIfSignedIn } from "@/components/landing/landing-islands";
 import { BrandMark } from "@/components/ui/brand";
 import { buttonClasses } from "@/components/ui/button";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { CAMPAIGN_LIMITS } from "@/lib/campaignLimits";
 import { pageTitle } from "@/lib/pageTitle";
+import { INVITE_EMAIL, INVITE_MAILTO } from "@/lib/signupStatus";
 
 // Server component: the page is pre-rendered; auth-aware bits and demos are client islands.
 
 const REPO = "https://github.com/JasonInTheBox/DireConnect";
-const EMAIL = "junjie.6liu@gmail.com";
-const TRY_MAIL = `mailto:${EMAIL}?subject=${encodeURIComponent("Trying DireConnect for my business")}`;
+const EMAIL = INVITE_EMAIL;
+const TRY_MAIL = INVITE_MAILTO;
 const HELP_MAIL = `mailto:${EMAIL}?subject=${encodeURIComponent("Helping build DireConnect")}`;
 const WRAP = "mx-auto w-full max-w-7xl px-4 sm:px-8";
 const BIG = "h-12 px-6 text-base";
-const H2 = "mt-3 text-4xl font-semibold tracking-tight text-ink sm:text-5xl";
+const H2 = "display mt-3 text-4xl text-ink sm:text-5xl";
 const LEAD = "mt-5 max-w-2xl text-lg text-muted sm:text-xl";
 const LINK = "underline decoration-line-strong underline-offset-4 transition-colors hover:text-ink hover:decoration-accent";
 
-// The same soft light from above as the sign-in pages.
-const WASH: CSSProperties = {
-  backgroundImage: [
-    "radial-gradient(60% 70% at 75% 10%, color-mix(in srgb, var(--sky) 55%, transparent), transparent 70%)",
-    "radial-gradient(50% 60% at 0% 100%, var(--accent-soft), transparent 75%)",
-  ].join(","),
-  backgroundRepeat: "no-repeat",
-  backgroundSize: "100% 56rem",
-};
+const NAV: Array<[string, string]> = [
+  ["How it works", "#how-it-works"],
+  ["Features", "#features"],
+  ["Coming next", "#coming-next"],
+  ["Get involved", "#get-involved"],
+];
 
 const STEPS = [
   {
@@ -93,9 +87,12 @@ const STEPS = [
     text: "Send now or schedule it, then follow every delivery.",
     scene: (
       <div>
-        <div className="flex items-baseline justify-between">
-          <p className="text-lg font-semibold text-ink">Autumn menu is here</p>
-          <span className="rounded-full bg-success-soft px-2.5 py-0.5 text-xs font-medium text-success">Sent</span>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-lg font-semibold text-ink">Autumn menu is here</p>
+            <span className="mt-1 inline-block rounded-full bg-success-soft px-2.5 py-0.5 text-xs font-medium text-success">Sent</span>
+          </div>
+          <DeliveredMark />
         </div>
         <div className="mt-5 flex h-3 gap-1 overflow-hidden rounded-full">
           <span className="origin-left rounded-full bg-success [animation:fill_1.2s_ease-out_both]" style={{ flexGrow: 7 }} />
@@ -122,55 +119,61 @@ const STEPS = [
 
 export default function Home() {
   return (
-    <div className="theme-bg min-h-screen bg-canvas" style={WASH}>
+    <div className="paper-hero min-h-screen bg-canvas">
       <title>{pageTitle("")}</title>
       <RedirectIfSignedIn />
 
-      <header className="sticky top-0 z-20 border-b border-transparent bg-canvas/70 backdrop-blur-md">
-          <div className={`${WRAP} flex h-16 items-center justify-between gap-4`}>
-            <Link href="/" aria-label="DireConnect home" className="rounded-control">
-              <BrandMark />
-            </Link>
-            <nav aria-label="Site" className="hidden items-center gap-8 text-[15px] text-muted md:flex">
-              <a href="#how-it-works" className="transition-colors hover:text-ink">How it works</a>
-              <a href="#features" className="transition-colors hover:text-ink">Features</a>
-              <a href="#coming-next" className="transition-colors hover:text-ink">Coming next</a>
-              <a href="#get-involved" className="transition-colors hover:text-ink">Get involved</a>
-            </nav>
-            <div className="flex items-center gap-2">
-              <NavAuthLinks />
-            </div>
+      <header className="sticky top-0 z-20 bg-canvas/90 backdrop-blur-md">
+        <div className={`${WRAP} flex h-16 items-center justify-between gap-4`}>
+          <Link href="/" aria-label="DireConnect home" className="rounded-control">
+            <BrandMark />
+          </Link>
+          <nav aria-label="Site" className="hidden items-center gap-8 text-[15px] text-muted md:flex">
+            {NAV.map(([label, href]) => (
+              <a key={href} href={href} className="transition-colors hover:text-ink">
+                {label}
+              </a>
+            ))}
+          </nav>
+          <div className="flex items-center gap-1">
+            <NavAuthLinks />
+            <MobileNav links={NAV} />
           </div>
-        </header>
+        </div>
+        {/* The airmail edge: the page reads as one envelope. */}
+        <div aria-hidden="true" className="airmail-edge h-1.5" />
+      </header>
 
-        <section className={`theme-hero ${WRAP} grid min-h-[calc(100svh-4rem)] items-center gap-12 py-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)] lg:gap-20`}>
-          <div className="min-w-0">
-            <h1 className="text-5xl font-semibold leading-[1.04] tracking-tight text-ink [overflow-wrap:break-word] sm:text-6xl xl:text-7xl">
-              Turn one-time customers into regulars
-            </h1>
-            <p className="mt-6 max-w-lg text-xl text-muted">
-              Email the customers who opted in, then see who it reached.
-            </p>
-            <div className="mt-10 flex flex-wrap gap-3">
-              <a href={TRY_MAIL} className={buttonClasses({ variant: "primary", className: `${BIG} shadow-float` })}>
-                Ask to try it free
-              </a>
-              <a href="#how-it-works" className={buttonClasses({ variant: "secondary", className: BIG })}>
-                See how it works
-              </a>
-            </div>
-            <p className="mt-6 text-sm text-muted">Free and non-commercial while it is being tested.</p>
+      <section className={`${WRAP} grid min-h-[calc(100svh-4.5rem)] items-center gap-12 pb-12 pt-28 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)] lg:gap-20 lg:pt-12`}>
+        <div className="min-w-0">
+          <h1 className="display text-5xl leading-[1.04] text-ink [overflow-wrap:break-word] sm:text-6xl xl:text-7xl">
+            Write to the regulars who asked
+          </h1>
+          <p className="mt-6 max-w-lg text-xl text-muted">
+            Keep a customer list with their consent, send a short email, and see who it reached.
+          </p>
+          <div className="mt-10 flex flex-wrap gap-3">
+            <a href={TRY_MAIL} className={buttonClasses({ variant: "primary", className: `${BIG} shadow-float` })}>
+              <Icon name="send" /> Ask for an invite
+            </a>
+            <a href="#how-it-works" className={buttonClasses({ variant: "secondary", className: BIG })}>
+              See how it works
+            </a>
           </div>
-          <div className="min-w-0">
-            <AudienceDemo />
-            <p className="mt-3 text-center text-sm text-muted">Flip a switch: only customers who said yes get the email.</p>
-          </div>
-        </section>
+          <p className="mt-6 max-w-md text-sm text-muted">
+            Accounts are by invitation and free while DireConnect is being tested. The button opens an email to {EMAIL}.
+          </p>
+        </div>
+        <div className="min-w-0">
+          <AudienceDemo />
+          <p className="mt-3 text-center text-sm text-muted">Flip a switch: only customers who said yes get the email.</p>
+        </div>
+      </section>
 
       <main>
         <section id="how-it-works" className="scroll-mt-16 border-y border-line bg-sunken/60 py-28">
           <div className={WRAP}>
-            <h2 className={H2}>From a customer list to customers coming back</h2>
+            <h2 className={H2}>From your list to their inbox</h2>
             <p className={LEAD}>Four steps, each one a screen in the app.</p>
             <div className="mt-14">
               <StepsShowcase steps={STEPS} />
@@ -179,26 +182,26 @@ export default function Home() {
         </section>
 
         <section id="features" className="scroll-mt-16 py-28">
-          <div className={`${WRAP} grid gap-14 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)]`}>
-            <div>
-              <h2 className={H2}>Careful by design</h2>
-              <p className={LEAD}>
-                Everything a small business needs to send a campaign without spamming anyone.
-              </p>
+          <div className={WRAP}>
+            <h2 className={H2}>Careful with every letter</h2>
+            <p className={LEAD}>Built so a small business can email its customers without spamming anyone.</p>
+            <div className="mt-14 grid gap-12 md:grid-cols-3 md:gap-10">
+              <FeatureGroup icon="users" title="Consent comes first">
+                <Feature title="Consent on every customer">Customers without consent or an email address are skipped, and the review step says why.</Feature>
+                <Feature title="One-click unsubscribe">Every email carries a link. One confirm and the customer is off every future campaign.</Feature>
+              </FeatureGroup>
+              <FeatureGroup icon="search" title="Check before it goes">
+                <Feature title="The exact recipient list">See the number and the names of everyone who will receive it.</Feature>
+                <Feature title="Send now or later">Send right away, or pick a date and time that suits your customers.</Feature>
+              </FeatureGroup>
+              <FeatureGroup icon="dashboard" title="See where it landed">
+                <Feature title="Results for every letter">Sent, failed and pending counts, with a plain reason for every failure.</Feature>
+                <Feature title="Small on purpose">
+                  While testing: up to {CAMPAIGN_LIMITS.maxRecipientsPerCampaign} recipients a campaign and{" "}
+                  {CAMPAIGN_LIMITS.maxEmailsPerRecipientPer24Hours} email per customer a day.
+                </Feature>
+              </FeatureGroup>
             </div>
-            <ul className="grid gap-x-12 sm:grid-cols-2">
-              <Feature icon="users" title="Consent on every customer">Customers without consent or an email address are skipped, and the review step says why.</Feature>
-              <Feature icon="search" title="Exact recipient preview">See the number and the names of everyone who will receive it before you send.</Feature>
-              <Feature icon="clock" title="Send now or later">Queue a campaign right away, or pick a date and time that suits your customers.</Feature>
-              <Feature icon="dashboard" title="Results at a glance">Sent, failed and pending counts, with a plain reason for every failure.</Feature>
-              <Feature icon="x" title="One-click unsubscribe">Every email carries a link that removes the customer from all future campaigns.</Feature>
-              <Feature icon="building" title="Several businesses, one login">Keep each business’s customers and campaigns apart.</Feature>
-              <Feature icon="check" title="Small on purpose">
-                While testing: up to {CAMPAIGN_LIMITS.maxRecipientsPerCampaign} recipients a campaign and{" "}
-                {CAMPAIGN_LIMITS.maxEmailsPerRecipientPer24Hours} email per customer a day.
-              </Feature>
-              <Feature icon="user" title="Your account, your data">Reset your password and manage your sign-in from the account page.</Feature>
-            </ul>
           </div>
         </section>
 
@@ -220,29 +223,28 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="get-involved" className="scroll-mt-16 bg-accent-soft py-28">
-          <div className={`${WRAP} grid gap-14 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center`}>
+        <section id="get-involved" className="scroll-mt-16 bg-sunken">
+          <div aria-hidden="true" className="airmail-edge h-1.5" />
+          <div className={`${WRAP} grid gap-14 py-28 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center`}>
             <div>
-              <h2 className={H2}>A free project, looking for people</h2>
+              <h2 className={H2}>Write to us</h2>
               <p className={LEAD}>
-                DireConnect is a personal, non-commercial project. Accounts are opened by
-                invitation while it is being tested.
+                DireConnect is a personal, non-commercial project. Running a small business, or want to help build it? Say hello.
               </p>
               <p className="mt-6 text-lg text-ink">
-                Write to <a href={`mailto:${EMAIL}`} className={`font-semibold ${LINK}`}>{EMAIL}</a>
+                <a href={`mailto:${EMAIL}`} className={`font-semibold ${LINK}`}>
+                  {EMAIL}
+                </a>
               </p>
-              <div className="mt-6 max-w-xl">
-                <LandingSignupNotice />
-              </div>
             </div>
             <div className="grid gap-5 sm:grid-cols-2">
               <Card title="Run a small business?" text="Tell us about it and we will set up a free account to test with your customers.">
                 <a href={TRY_MAIL} className={buttonClasses({ variant: "primary", className: BIG })}>
-                  Ask to try it free
+                  <Icon name="send" /> Ask for an invite
                 </a>
               </Card>
               <Card title="Build or design?" text="Next.js, Express, Prisma, BullMQ, Supabase and Resend. Loyalty rewards are the next big piece.">
-                <a href={HELP_MAIL} className={buttonClasses({ variant: "primary", className: BIG })}>
+                <a href={HELP_MAIL} className={buttonClasses({ variant: "secondary", className: BIG })}>
                   Email to collaborate
                 </a>
                 <a href={REPO} className={`mt-3 block text-muted ${LINK}`}>
@@ -260,7 +262,7 @@ export default function Home() {
             <BrandMark />
             <p className="mt-4 max-w-xs text-muted">Customer lists and careful email campaigns for small businesses.</p>
           </div>
-          <FooterLinks title="Product" links={[["How it works", "#how-it-works"], ["Features", "#features"], ["Coming next", "#coming-next"]]} />
+          <FooterLinks title="Product" links={NAV.slice(0, 3)} />
           <FooterLinks title="Project" links={[["Contact", `mailto:${EMAIL}`], ["GitHub", REPO], ["Get involved", "#get-involved"]]} />
         </div>
         <div className={`${WRAP} border-t border-line py-6 text-sm text-muted`}>
@@ -271,17 +273,37 @@ export default function Home() {
   );
 }
 
-function Feature({ icon, title, children }: { icon: IconName; title: string; children: ReactNode }) {
+function FeatureGroup({ icon, title, children }: { icon: IconName; title: string; children: ReactNode }) {
   return (
-    <li className="flex gap-4 border-t border-line py-6">
-      <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-accent-soft text-accent">
-        <Icon name={icon} />
-      </span>
-      <div>
-        <h3 className="text-lg font-semibold text-ink">{title}</h3>
-        <p className="mt-1 text-base text-muted">{children}</p>
-      </div>
+    <div className="border-t-2 border-ink pt-6">
+      <h3 className="flex items-center gap-2.5 text-xl font-semibold text-ink">
+        <Icon name={icon} className="h-5 w-5 text-pop" />
+        {title}
+      </h3>
+      <ul className="mt-6 space-y-6">{children}</ul>
+    </div>
+  );
+}
+
+function Feature({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <li>
+      <p className="font-semibold text-ink">{title}</p>
+      <p className="mt-1 text-base text-muted">{children}</p>
     </li>
+  );
+}
+
+/** A postmark stamped on the delivered campaign. Decorative: the "Sent" badge carries the meaning. */
+function DeliveredMark() {
+  return (
+    <span
+      aria-hidden="true"
+      className="flex h-20 w-20 shrink-0 rotate-[-12deg] flex-col items-center justify-center rounded-full border-[3px] border-double border-pop/70 font-[family-name:var(--font-display)] text-[10px] font-semibold tracking-wide text-pop"
+    >
+      <span>DELIVERED</span>
+      <span className="mt-0.5 border-y border-pop/50 px-1 text-[9px]">NOV 2026</span>
+    </span>
   );
 }
 

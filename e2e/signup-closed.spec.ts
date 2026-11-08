@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { mockApi } from "./helpers/app";
 
 const NOTICE =
-  "DireConnect is a non-commercial project, so new accounts aren’t being created right now. If you already have an account, you can log in.";
+  "DireConnect is a non-commercial project, so accounts are opened by invitation while it is being tested. Write to junjie.6liu@gmail.com to ask for one, or log in if you already have an account.";
 
 /** The placeholder line; other `role="status"` regions (the toast area) exist on every page. */
 function checkingStatus(page: Page) {
@@ -29,29 +29,30 @@ test("signup says sign-up is closed instead of showing the form", async ({ page 
   const state = await mockApi(page, { businesses: [], signupsDisabled: true });
   await page.goto("/signup");
 
-  await expect(page.getByRole("heading", { name: "Sign-up is closed" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Accounts are by invitation" })).toBeVisible();
   await expect(page.getByRole("note")).toContainText(NOTICE);
   await expect(page.getByRole("link", { name: "Go to log in" })).toHaveAttribute("href", "/login");
   await expect(page.getByLabel("Email")).toHaveCount(0);
   await expect(page.getByLabel("Password")).toHaveCount(0);
-  await expect(page).toHaveTitle("Sign-up is closed · DireConnect");
+  await expect(page).toHaveTitle("Accounts are by invitation · DireConnect");
   expect(state.authRequests.filter((request) => request.path === "/auth/v1/signup")).toHaveLength(0);
 });
 
-test("the landing page shows the notice and drops the sign up link", async ({ page }) => {
+test("the landing page asks for an invite and drops the sign up link", async ({ page }) => {
   await mockApi(page, { businesses: [], signupsDisabled: true });
   await page.goto("/");
 
-  await expect(page.getByRole("note")).toContainText(NOTICE);
+  await expect(page.getByText("Accounts are by invitation and free while DireConnect is being tested.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Ask for an invite" }).first()).toHaveAttribute("href", /^mailto:/);
   await expect(page.getByRole("link", { name: "Log in" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Sign up" })).toHaveCount(0);
 });
 
-test("the login footer says no accounts are being created", async ({ page }) => {
+test("the login footer offers an invite instead of sign up", async ({ page }) => {
   await mockApi(page, { businesses: [], signupsDisabled: true });
   await page.goto("/login");
 
-  await expect(page.getByText("New accounts aren’t being created right now.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Ask for an invite" })).toHaveAttribute("href", /^mailto:/);
   await expect(page.getByRole("link", { name: "Sign up" })).toHaveCount(0);
 });
 
@@ -106,7 +107,7 @@ test("while the settings answer is pending and sign-ups are closed, the form nev
 
   release();
 
-  await expect(page.getByRole("heading", { name: "Sign-up is closed" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Accounts are by invitation" })).toBeVisible();
   await expect(page.getByLabel("Email")).toHaveCount(0);
   // Plain "closed" on first load does not steal focus.
   await expect(page.getByRole("note")).not.toBeFocused();
@@ -124,7 +125,7 @@ test("while the settings answer is pending, the landing page and login footer of
   await page.goto("/login");
   await expect(page.getByRole("heading", { name: "Log in" })).toBeVisible();
   await expect(page.getByText("Don’t have an account?")).toHaveCount(0);
-  await expect(page.getByText("New accounts aren’t being created right now.")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Ask for an invite" })).toHaveCount(0);
 
   release();
 
@@ -141,7 +142,7 @@ test("a refused sign-up shows the notice even when the settings request fails", 
   await page.getByLabel("Password").fill("a-long-password");
   await page.getByRole("button", { name: "Create account" }).click();
 
-  await expect(page.getByRole("heading", { name: "Sign-up is closed" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Accounts are by invitation" })).toBeVisible();
   await expect(page.getByRole("note")).toContainText(NOTICE);
   await expect(page.getByLabel("Email")).toHaveCount(0);
   await expect(page.getByText("Signups not allowed")).toHaveCount(0);

@@ -1,6 +1,9 @@
-export const SIGNUP_CLOSED_TITLE = "Sign-up is closed";
+export const INVITE_EMAIL = "junjie.6liu@gmail.com";
+export const INVITE_MAILTO = `mailto:${INVITE_EMAIL}?subject=${encodeURIComponent("Trying DireConnect for my business")}`;
+
+export const SIGNUP_CLOSED_TITLE = "Accounts are by invitation";
 export const SIGNUP_CLOSED_TEXT =
-  "DireConnect is a non-commercial project, so new accounts aren’t being created right now. If you already have an account, you can log in.";
+  `DireConnect is a non-commercial project, so accounts are opened by invitation while it is being tested. Write to ${INVITE_EMAIL} to ask for one, or log in if you already have an account.`;
 
 /**
  * The first status of the sign-up hook. Without a Supabase URL and publishable key there is nothing
