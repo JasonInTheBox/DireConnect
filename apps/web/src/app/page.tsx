@@ -122,7 +122,7 @@ const STEPS = [
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-canvas" style={WASH}>
+    <div className="theme-bg min-h-screen bg-canvas" style={WASH}>
       <title>{pageTitle("")}</title>
       <RedirectIfSignedIn />
 
@@ -143,7 +143,7 @@ export default function Home() {
           </div>
         </header>
 
-        <section className={`${WRAP} grid min-h-[calc(100svh-4rem)] items-center gap-12 py-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)] lg:gap-20`}>
+        <section className={`theme-hero ${WRAP} grid min-h-[calc(100svh-4rem)] items-center gap-12 py-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)] lg:gap-20`}>
           <div className="min-w-0">
             <h1 className="text-5xl font-semibold leading-[1.04] tracking-tight text-ink [overflow-wrap:break-word] sm:text-6xl xl:text-7xl">
               Turn one-time customers into regulars

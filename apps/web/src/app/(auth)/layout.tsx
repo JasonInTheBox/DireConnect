@@ -12,7 +12,7 @@ const WASH: CSSProperties = {
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-12" style={WASH}>
+    <main className="theme-bg theme-auth flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-12" style={WASH}>
       <Link href="/" className="mb-8 rounded-control" aria-label="DireConnect home">
         <BrandMark />
       </Link>

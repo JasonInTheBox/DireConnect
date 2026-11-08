@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
+import { Archivo, Bricolage_Grotesque, Fraunces, Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import { ToastProvider } from "@/components/ui/toast";
+import { ThemePreview } from "@/components/theme-preview";
 import "./globals.css";
+
+// Theme exploration faces (design/theme-options): one per option.
+const fraunces = Fraunces({ variable: "--font-fraunces", subsets: ["latin"], axes: ["opsz"] });
+const bricolage = Bricolage_Grotesque({ variable: "--font-bricolage", subsets: ["latin"] });
+const archivo = Archivo({ variable: "--font-archivo", subsets: ["latin"], axes: ["wdth"] });
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
@@ -26,11 +32,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${jakarta.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${jakarta.variable} ${geistMono.variable} ${fraunces.variable} ${bricolage.variable} ${archivo.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         {/* Above both route groups so a toast fired just before a navigation survives it. */}
         <ToastProvider>{children}</ToastProvider>
+        {process.env.NODE_ENV !== "production" && <ThemePreview />}
       </body>
     </html>
   );

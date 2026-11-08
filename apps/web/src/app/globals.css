@@ -202,3 +202,152 @@ dialog.drawer[open] {
     transform: none;
   }
 }
+
+/* ------------------------------------------------------------------------------------------
+   Theme exploration (design/theme-options). Pick one, then fold it into the tokens above and
+   delete this block, theme-preview.tsx and the unused faces in layout.tsx.
+   ------------------------------------------------------------------------------------------ */
+
+/* A · Postmark: paper, navy ink, stamp red. Letters to your regulars. */
+:root[data-theme="postmark"] {
+  color-scheme: light;
+  --canvas: #f6f1e7;
+  --surface: #fffdf8;
+  --sunken: #efe7d8;
+  --line: #e6dccb;
+  --line-strong: #cfc2a9;
+  --ink: #1f2a44;
+  --muted: #5d6273;
+  --accent: #b63a24;
+  --accent-hover: #982f1d;
+  --accent-ink: #fffdf8;
+  --accent-soft: #f6e3dc;
+  --sky: #d9cdb4;
+  --pop: #1f2a44;
+  --pop-strong: #141c30;
+  --pop-soft: #e3e6ee;
+  --success: #2f6b4a;
+  --success-soft: #e3efe6;
+  --warning: #85600f;
+  --warning-soft: #f5ecd6;
+  --danger: #a8392e;
+  --danger-soft: #f6e2de;
+  --font-display: var(--font-fraunces), Georgia, serif;
+}
+
+/* B · Main Street: daylight teal and butter yellow, a row of shops. */
+:root[data-theme="mainstreet"] {
+  color-scheme: light;
+  --canvas: #fbf7ee;
+  --surface: #ffffff;
+  --sunken: #f3ecdc;
+  --line: #e9e1cf;
+  --line-strong: #d6cbb2;
+  --ink: #1d2b2a;
+  --muted: #566663;
+  --accent: #0f766e;
+  --accent-hover: #0b5f58;
+  --accent-ink: #ffffff;
+  --accent-soft: #dff2ef;
+  --sky: #cdeee8;
+  --pop: #b4531f;
+  --pop-strong: #9a4519;
+  --pop-soft: #fbe7d9;
+  --success: #2f7a52;
+  --success-soft: #e5f3eb;
+  --warning: #8d6214;
+  --warning-soft: #f8f0dc;
+  --danger: #b8423b;
+  --danger-soft: #f9e8e6;
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* C · Route map: forest night, cream type, marigold routes from your shop to your customers. */
+:root[data-theme="routemap"] {
+  color-scheme: dark;
+  --canvas: #10241d;
+  --surface: #163027;
+  --sunken: #0c1c16;
+  --line: #24402f;
+  --line-strong: #33523f;
+  --ink: #f1ead8;
+  --muted: #a9b8ad;
+  --accent: #f2b544;
+  --accent-hover: #f6c76b;
+  --accent-ink: #1d1a10;
+  --accent-soft: #1f3a2d;
+  --sky: #2b4a39;
+  --pop: #f08a68;
+  --pop-strong: #f4a084;
+  --pop-soft: #3a2420;
+  --success: #7cc79c;
+  --success-soft: #16291f;
+  --warning: #e2bb6a;
+  --warning-soft: #2b2414;
+  --danger: #ee9890;
+  --danger-soft: #331d1c;
+  --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+}
+
+:root[data-theme] body {
+  font-family: var(--font-sans);
+}
+
+:root[data-theme] :is(h1, h2, h3) {
+  font-family: var(--font-display);
+}
+
+:root[data-theme="postmark"] :is(h1, h2) {
+  font-weight: 600;
+  font-variation-settings: "opsz" 120;
+  letter-spacing: -0.02em;
+}
+
+:root[data-theme="routemap"] :is(h1, h2) {
+  font-stretch: 112%;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+:root[data-theme="mainstreet"] :is(h1, h2) {
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+/* Backgrounds: the art sits on the first screen; every section below keeps its solid ground. */
+:root[data-theme="postmark"] .theme-bg {
+  background: url("/themes/postmark-hero.svg") top center / max(100%, 90rem) auto no-repeat, var(--canvas) !important;
+}
+
+:root[data-theme="postmark"] .theme-auth {
+  background: url("/themes/postmark-auth.svg") center / cover no-repeat, var(--canvas) !important;
+}
+
+:root[data-theme="mainstreet"] .theme-bg {
+  background:
+    url("/themes/mainstreet-street.svg") center calc(100svh - 11rem) / auto 11rem repeat-x,
+    linear-gradient(to bottom, var(--sky), var(--canvas) calc(100svh - 11rem)) top / 100% 100svh no-repeat,
+    var(--canvas) !important;
+}
+
+:root[data-theme="mainstreet"] .theme-hero {
+  padding-bottom: 12rem;
+}
+
+:root[data-theme="mainstreet"] .theme-auth {
+  padding-bottom: 15rem;
+  background:
+    url("/themes/mainstreet-street.svg") bottom center / auto 13rem repeat-x,
+    linear-gradient(to bottom, var(--sky), var(--canvas) 70%),
+    var(--canvas) !important;
+}
+
+:root[data-theme="routemap"] .theme-bg {
+  background: url("/themes/routemap-hero.svg") top center / max(100%, 90rem) auto no-repeat, var(--canvas) !important;
+}
+
+:root[data-theme="routemap"] .theme-auth {
+  background: url("/themes/routemap-plain.svg") center / cover no-repeat, var(--canvas) !important;
+}
