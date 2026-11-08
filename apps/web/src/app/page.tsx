@@ -173,7 +173,7 @@ export default function Home() {
       </section>
 
       <main>
-        <section id="how-it-works" className="scroll-mt-16 border-y border-line bg-sunken/60 py-28">
+        <section id="how-it-works" className="scroll-mt-20 border-y border-line bg-sunken/60 py-28">
           <div className={WRAP}>
             <h2 className={H2}>From your list to their inbox</h2>
             <p className={LEAD}>Four steps, each one a screen in the app.</p>
@@ -183,7 +183,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="features" className="scroll-mt-16 py-28">
+        <section id="features" className="scroll-mt-20 py-28">
           <div className={WRAP}>
             <h2 className={H2}>Careful with every letter</h2>
             <p className={LEAD}>Built so a small business can email its customers without spamming anyone.</p>
@@ -207,7 +207,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="coming-next" className="scroll-mt-16 border-b border-line bg-surface py-28">
+        <section id="coming-next" className="scroll-mt-20 border-b border-line bg-surface py-28">
           <div className={`${WRAP} grid items-center gap-16 lg:grid-cols-[1fr_0.9fr]`}>
             <div>
               <p className="text-sm font-semibold uppercase tracking-wider text-pop-strong">Coming next · not released yet</p>
@@ -225,7 +225,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="get-involved" className="scroll-mt-16 bg-sunken">
+        <section id="get-involved" className="scroll-mt-20 bg-sunken">
           <div aria-hidden="true" className="airmail-edge h-1.5" />
           <div className={`${WRAP} grid gap-14 py-28 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center`}>
             <div>

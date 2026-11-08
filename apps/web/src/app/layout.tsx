@@ -33,6 +33,8 @@ export default function RootLayout({
       className={`${jakarta.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
       // THEME_SCRIPT sets data-theme before React hydrates.
       suppressHydrationWarning
+      // Lets Next turn smooth scrolling off during route changes, so page navigations stay instant.
+      data-scroll-behavior="smooth"
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />

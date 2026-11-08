@@ -130,6 +130,13 @@
     color: var(--ink);
   }
 
+  /* In-page links glide to their section; reduced motion keeps the instant jump. */
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+
   html {
     accent-color: var(--accent);
     caret-color: var(--accent);
