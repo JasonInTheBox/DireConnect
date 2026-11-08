@@ -66,7 +66,7 @@ export function ThemeToggle({ showLabel = false, className }: { showLabel?: bool
       .then(() => {
         document.documentElement.animate(
           { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
-          { duration: 550, easing: "cubic-bezier(0.2, 0, 0, 1)", pseudoElement: "::view-transition-new(root)" },
+          { duration: 1100, easing: "cubic-bezier(0.2, 0, 0, 1)", pseudoElement: "::view-transition-new(root)" },
         );
       })
       .catch(() => undefined);
