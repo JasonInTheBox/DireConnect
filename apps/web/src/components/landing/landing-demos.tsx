@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Icon } from "@/components/ui/icons";
 
 const PEOPLE = [
@@ -52,7 +52,7 @@ export function AudienceDemo() {
               aria-checked={optedIn[i]}
               aria-label={`${person.name} ${person.last} agreed to emails`}
               onClick={() => setOptedIn((current) => current.map((value, j) => (j === i ? !value : value)))}
-              className={`relative h-7 w-12 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${optedIn[i] ? "bg-accent" : "bg-line-strong"}`}
+              className={`relative h-7 w-12 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${optedIn[i] ? "bg-accent" : "bg-muted/70"}`}
             >
               <span
                 className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-surface shadow-card transition-transform duration-200 ease-out ${optedIn[i] ? "translate-x-5" : "translate-x-0"}`}
@@ -76,6 +76,16 @@ type Step = { title: string; text: string; scene: ReactNode };
 /** "How it works" as four tabs, each showing its screen. */
 export function StepsShowcase({ steps }: { steps: Step[] }) {
   const [active, setActive] = useState(0);
+  const panel = useRef<HTMLDivElement>(null);
+
+  // Stacked on phones and tablets, the panel sits below all four steps: bring the change into view.
+  function choose(i: number) {
+    setActive(i);
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      panel.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "nearest" });
+    }
+  }
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
@@ -91,7 +101,7 @@ export function StepsShowcase({ steps }: { steps: Step[] }) {
               aria-selected={selected}
               aria-controls="step-panel"
               tabIndex={selected ? 0 : -1}
-              onClick={() => setActive(i)}
+              onClick={() => choose(i)}
               onKeyDown={(event) => {
                 const move = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
                 if (move) {
@@ -117,12 +127,15 @@ export function StepsShowcase({ steps }: { steps: Step[] }) {
           );
         })}
       </div>
-      <div
-        role="tabpanel"
-        id="step-panel"
-        aria-labelledby={`step-tab-${active}`}
-        className="grid rounded-container border border-line bg-surface p-6 shadow-float sm:p-8"
-      >
+      <div ref={panel} className="scroll-mt-24 overflow-hidden rounded-container border border-line bg-surface shadow-float">
+        {/* The envelope edge: each step is a letter on its way. */}
+        <div aria-hidden="true" className="airmail-edge h-1.5" />
+        <div
+          role="tabpanel"
+          id="step-panel"
+          aria-labelledby={`step-tab-${active}`}
+          className="grid p-6 sm:p-8"
+        >
         {/* Every scene shares one grid cell, so the panel keeps the tallest scene's height. */}
         {steps.map((step, i) => (
           <div
@@ -133,6 +146,7 @@ export function StepsShowcase({ steps }: { steps: Step[] }) {
             {step.scene}
           </div>
         ))}
+        </div>
       </div>
     </div>
   );
@@ -150,7 +164,7 @@ export function LoyaltyDemo() {
     <div className="rounded-[16px] bg-gradient-to-br from-reward to-reward-deep p-6 text-white shadow-float">
       <div className="flex items-center justify-between">
         <p className="font-semibold">Corner Bakery rewards</p>
-        <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-medium">Preview</span>
+        <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-reward-deep">Preview</span>
       </div>
       <p className="mt-6 text-5xl font-semibold tabular-nums" aria-live="polite">
         {Math.min(points, GOAL)} <span className="text-lg font-medium">/ {GOAL} points</span>
@@ -161,7 +175,7 @@ export function LoyaltyDemo() {
           style={{ transform: `scaleX(${Math.min(points, GOAL) / GOAL})` }}
         />
       </div>
-      <p className="mt-3 min-h-6 text-sm text-white/90">
+      <p className="mt-3 min-h-6 text-sm text-white">
         {unlocked ? "Free coffee unlocked. Enjoy!" : `${GOAL - points} points to a free coffee`}
       </p>
       <button

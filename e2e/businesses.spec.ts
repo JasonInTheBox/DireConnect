@@ -58,8 +58,7 @@ test.describe("businesses page", () => {
     const api = await mockApi(page, { businesses: [bakery, florist] });
     await page.goto("/businesses");
 
-    await page.getByRole("button", { name: "Actions for Corner Bakery" }).click();
-    await page.getByRole("menuitem", { name: "Edit" }).click();
+    await page.getByRole("button", { name: "Edit Corner Bakery" }).click();
 
     const dialog = page.getByRole("dialog", { name: "Edit business" });
     await expect(dialog.getByLabel("Business name")).toHaveValue("Corner Bakery");
@@ -77,8 +76,7 @@ test.describe("businesses page", () => {
     const api = await mockApi(page, { businesses: [bakery, florist] });
     await page.goto("/businesses");
 
-    await page.getByRole("button", { name: "Actions for Fern Florist" }).click();
-    await page.getByRole("menuitem", { name: "Delete" }).click();
+    await page.getByRole("button", { name: "Delete Fern Florist" }).click();
 
     const dialog = page.getByRole("dialog", { name: "Delete Fern Florist?" });
     const confirm = dialog.getByRole("button", { name: "Delete business" });
@@ -97,8 +95,7 @@ test.describe("businesses page", () => {
     await mockApi(page, { businesses: [bakery, florist], delayWritesMs: 1_500 });
     await page.goto("/businesses");
 
-    await page.getByRole("button", { name: "Actions for Fern Florist" }).click();
-    await page.getByRole("menuitem", { name: "Delete" }).click();
+    await page.getByRole("button", { name: "Delete Fern Florist" }).click();
 
     const dialog = page.getByRole("dialog", { name: "Delete Fern Florist?" });
     await dialog.getByLabel(/Type .Fern Florist. to confirm/).fill("Fern Florist");
@@ -115,8 +112,7 @@ test.describe("businesses page", () => {
     await mockApi(page, { businesses: [bakery, florist], failFirstDelete: true });
     await page.goto("/businesses");
 
-    await page.getByRole("button", { name: "Actions for Fern Florist" }).click();
-    await page.getByRole("menuitem", { name: "Delete" }).click();
+    await page.getByRole("button", { name: "Delete Fern Florist" }).click();
 
     const dialog = page.getByRole("dialog", { name: "Delete Fern Florist?" });
     const confirm = dialog.getByRole("button", { name: "Delete business" });

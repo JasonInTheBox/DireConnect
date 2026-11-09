@@ -1,65 +1,70 @@
-/* Hallmark · custom · soft sky blue + coral (rewards only) · Plus Jakarta Sans · signature: the consent switches in the hero */
-/* critique: one soft light from above on every surface; blue acts, coral rewards */
+/* Hallmark · custom · Postmark: paper, navy ink, stamp red on post objects only · Fraunces + Plus Jakarta Sans · signature: the consent switches in the hero */
+/* critique: ink does the work, red only where a post office would put it */
 /* waive 54,67: the Coming next kicker is kept exactly as the owner asked */
 /* waive 26b: disabled states live in components/ui/button.tsx and field.tsx */
 @import "tailwindcss";
 
-/* Design tokens. Light is the default; dark follows the OS setting. */
+/* The theme is chosen by data-theme on <html> (set before paint from the saved choice or the OS). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Design tokens. Light is the default; dark applies when <html data-theme="dark">. */
 :root {
-  color-scheme: light dark;
-  /* Soft sky blue for every action; coral only for loyalty and rewards. */
-  --canvas: #f3f7fb;
-  --surface: #ffffff;
-  --sunken: #e8eff6;
-  --line: #dde5ee;
-  --line-strong: #c5d1de;
-  --ink: #1b2533;
-  --muted: #5a6878;
-  --accent: #2a70a8;
-  --accent-hover: #235f8f;
-  --accent-ink: #ffffff;
-  --accent-soft: #e6f0f8;
-  --sky: #a9d0ee;
-  --pop: #c2502e;
-  --pop-strong: #b4472a;
-  --pop-soft: #faebe4;
-  --success: #2f7a52;
-  --success-soft: #e5f3eb;
-  --warning: #8d6214;
-  --warning-soft: #f8f0dc;
-  --danger: #b8423b;
-  --danger-soft: #f9e8e6;
-  /* The loyalty card keeps one deep coral in both themes, so its white text stays legible. */
-  --reward: #c2410c;
-  --reward-deep: #9a3412;
+  color-scheme: light;
+  /* Paper and navy ink for everything you read and press; stamp red (pop) only on post objects. */
+  --canvas: #f6f1e7;
+  --surface: #fffdf8;
+  --sunken: #efe7d8;
+  --line: #e6dccb;
+  --line-strong: #cfc2a9;
+  --ink: #1f2a44;
+  --muted: #5d6273;
+  --accent: #1f2a44;
+  --accent-hover: #2d3b5d;
+  --accent-ink: #fffdf8;
+  --accent-soft: #e4e6ee;
+  --sky: #d9cdb4;
+  --pop: #b63a24;
+  --pop-strong: #8f2c1a;
+  --pop-ink: #fffdf8;
+  --pop-soft: #f6e3dc;
+  --success: #2f6b4a;
+  --success-soft: #e3efe6;
+  --warning: #85600f;
+  --warning-soft: #f5ecd6;
+  --danger: #9b2335;
+  --danger-soft: #f7e1e3;
+  /* The loyalty card keeps one deep stamp red in both themes, so its white text stays legible. */
+  --reward: #b63a24;
+  --reward-deep: #7f2716;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --canvas: #121a24;
-    --surface: #182230;
-    --sunken: #0f161f;
-    --line: #253244;
-    --line-strong: #34445a;
-    --ink: #e6edf5;
-    --muted: #9aa8b8;
-    --accent: #7cb8e6;
-    --accent-hover: #9cc9ec;
-    --accent-ink: #0d2235;
-    --accent-soft: #1c2a3b;
-    --sky: #3d6488;
-    --pop: #f08a68;
-    --pop-strong: #f4a084;
-    --pop-soft: #3a2420;
-    --success: #7cc79c;
-    --success-soft: #16291f;
-    --warning: #e2bb6a;
-    --warning-soft: #2b2414;
-    --danger: #ee9890;
-    --danger-soft: #331d1c;
-    --reward: #c2410c;
-    --reward-deep: #9a3412;
-  }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  /* A letter read by lamplight: navy paper, cream ink, the same stamp red. */
+  --canvas: #141925;
+  --surface: #1b2130;
+  --sunken: #10141d;
+  --line: #283044;
+  --line-strong: #384259;
+  --ink: #efe8d8;
+  --muted: #a8aebb;
+  --accent: #efe8d8;
+  --accent-hover: #fbf6ea;
+  --accent-ink: #1f2a44;
+  --accent-soft: #252d40;
+  --sky: #2e3850;
+  --pop: #c2452d;
+  --pop-strong: #ec8a73;
+  --pop-ink: #fffdf8;
+  --pop-soft: #3a2320;
+  --success: #7cc79c;
+  --success-soft: #16291f;
+  --warning: #e2bb6a;
+  --warning-soft: #2b2414;
+  --danger: #f0959b;
+  --danger-soft: #35191d;
+  --reward: #b63a24;
+  --reward-deep: #7f2716;
 }
 
 @theme inline {
@@ -79,6 +84,7 @@
   --color-reward: var(--reward);
   --color-reward-deep: var(--reward-deep);
   --color-pop-strong: var(--pop-strong);
+  --color-pop-ink: var(--pop-ink);
   --color-pop-soft: var(--pop-soft);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
@@ -88,13 +94,14 @@
   --color-danger-soft: var(--danger-soft);
 
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-fraunces), Georgia, serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
   --radius-control: 8px;
   --radius-container: 14px;
 
-  --shadow-float: 0 16px 40px -12px rgb(27 52 82 / 0.18), 0 2px 6px rgb(27 52 82 / 0.06);
-  --shadow-card: 0 1px 2px rgb(27 52 82 / 0.05), 0 6px 16px -8px rgb(27 52 82 / 0.08);
+  --shadow-float: 0 18px 40px -16px rgb(31 42 68 / 0.22), 0 2px 6px rgb(31 42 68 / 0.06);
+  --shadow-card: 0 1px 2px rgb(31 42 68 / 0.06), 0 6px 16px -8px rgb(31 42 68 / 0.1);
 }
 
 @layer base {
@@ -123,6 +130,13 @@
     color: var(--ink);
   }
 
+  /* In-page links glide to their section; reduced motion keeps the instant jump. */
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+
   html {
     accent-color: var(--accent);
     caret-color: var(--accent);
@@ -138,6 +152,11 @@
   h2,
   h3 {
     text-wrap: balance;
+  }
+
+  p,
+  li {
+    text-wrap: pretty;
   }
 }
 
@@ -202,3 +221,64 @@ dialog.drawer[open] {
     transform: none;
   }
 }
+
+
+/* Post objects. Each is a real thing from the mail: use one per section, never as wallpaper. */
+@layer components {
+  /* The red-and-navy edge of an airmail envelope. */
+  .airmail-edge {
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--pop) 0 10px,
+      transparent 10px 16px,
+      var(--accent) 16px 26px,
+      transparent 26px 32px
+    );
+  }
+
+  /* Display serif for headings set large; small headings stay in the body face. */
+  .display {
+    font-family: var(--font-display);
+    font-variation-settings: "opsz" 96;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  /* Landing hero and sign-in backdrops: postmarks and a stamp at the edges, never behind text. */
+  .paper-hero {
+    background: url("/postmark/hero.svg") top center / max(100%, 90rem) auto no-repeat;
+  }
+
+  .paper-auth {
+    background: url("/postmark/auth.svg") center / cover no-repeat;
+  }
+
+  @media (max-width: 1023px) {
+    .paper-hero,
+    .paper-auth {
+      background: url("/postmark/phone.svg") top right / 26rem auto no-repeat;
+    }
+  }
+
+  [data-theme="dark"] .paper-hero {
+    background-image: url("/postmark/hero-dark.svg");
+  }
+
+  [data-theme="dark"] .paper-auth {
+    background-image: url("/postmark/auth-dark.svg");
+  }
+
+  @media (max-width: 1023px) {
+    [data-theme="dark"] :is(.paper-hero, .paper-auth) {
+      background-image: url("/postmark/phone-dark.svg");
+    }
+  }
+}
+
+/* Theme switch: the new theme grows as a circle from the toggle (theme-toggle.tsx drives the clip). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+

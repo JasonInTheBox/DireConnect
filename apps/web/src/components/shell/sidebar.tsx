@@ -10,6 +10,7 @@ import { BusinessSwitcher } from "./business-switcher";
 import { useSession } from "./session-provider";
 import { useLogout } from "./use-logout";
 import { BrandMark } from "@/components/ui/brand";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 type NavEntry = { href: string; label: string; icon: IconName; exact?: boolean };
 
@@ -90,9 +91,22 @@ export function Sidebar({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className={cn("space-y-3 p-3", collapsed && "px-2")}>
-        {collapsed ? null : (
-          <p className="px-1 pt-1"><BrandMark size="sm" /></p>
-        )}
+        {/* Collapse sits with the brand at the top, where the sidebar starts, not after the account links. */}
+        <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between pl-1 pt-1")}>
+          {collapsed ? null : <BrandMark size="sm" />}
+          {onToggleCollapsed ? (
+            <button
+              type="button"
+              onClick={onToggleCollapsed}
+              aria-expanded={!collapsed}
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              className="flex h-9 w-9 items-center justify-center rounded-control text-muted transition-colors hover:bg-surface/70 hover:text-ink"
+            >
+              <Icon name="panel" />
+            </button>
+          ) : null}
+        </div>
         <BusinessSwitcher collapsed={collapsed} onNavigate={onNavigate} />
       </div>
 
@@ -136,6 +150,7 @@ export function Sidebar({
             </span>
           </div>
         )}
+        <ThemeToggle showLabel={!collapsed} className="hover:bg-surface/70" />
         <button
           type="button"
           onClick={handleLogout}
@@ -149,22 +164,6 @@ export function Sidebar({
           <Icon name="logout" />
           {collapsed ? null : "Log out"}
         </button>
-        {onToggleCollapsed ? (
-          <button
-            type="button"
-            onClick={onToggleCollapsed}
-            aria-expanded={!collapsed}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className={cn(
-              "flex h-10 w-full items-center rounded-control text-sm font-medium text-muted transition-colors hover:bg-surface/70 hover:text-ink",
-              collapsed ? "justify-center" : "gap-2.5 px-2.5",
-            )}
-          >
-            <Icon name="panel" />
-            {collapsed ? null : "Collapse"}
-          </button>
-        ) : null}
       </div>
     </div>
   );

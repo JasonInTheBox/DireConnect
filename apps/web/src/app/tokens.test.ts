@@ -19,7 +19,7 @@ function parseTokens(block: string | undefined): Record<string, string> {
 
 const light = parseTokens(css.match(/:root\s*\{([^}]*)\}/)?.[1]);
 const dark = parseTokens(
-  css.match(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([^}]*)\}/)?.[1],
+  css.match(/:root\[data-theme="dark"\]\s*\{([^}]*)\}/)?.[1],
 );
 
 function luminance(hex: string): number {
@@ -54,6 +54,9 @@ const textPairs: Array<[string, string]> = [
   ["warning", "surface"],
   ["danger", "danger-soft"],
   ["danger", "surface"],
+  ["pop-ink", "pop"],
+  ["pop-strong", "canvas"],
+  ["pop-strong", "surface"],
 ];
 
 describe("design tokens", () => {

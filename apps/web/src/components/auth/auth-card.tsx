@@ -17,7 +17,7 @@ export function AuthCard({
       {/* React hoists <title> into <head>, on the server too (WCAG 2.4.2). */}
       <title>{pageTitle(title)}</title>
       <section className="rounded-container border border-line bg-surface p-8 shadow-float sm:p-10">
-        <h1 className="text-center text-3xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="display text-center text-3xl text-ink">{title}</h1>
         {subtitle ? <p className="mt-2 text-center text-base text-muted">{subtitle}</p> : null}
         <div className="mt-8">{children}</div>
       </section>

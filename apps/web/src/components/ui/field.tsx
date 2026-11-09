@@ -1,5 +1,6 @@
 import { useId, type InputHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { cn } from "@/lib/cn";
+import { Icon } from "./icons";
 
 type FieldMeta = {
   label: string;
@@ -41,7 +42,8 @@ function FieldFrame({
         </p>
       ) : null}
       {error ? (
-        <p id={`${id}-error`} className="text-xs text-danger">
+        <p id={`${id}-error`} className="flex items-start gap-1.5 text-xs text-danger">
+          <Icon name="alert" className="mt-px h-3.5 w-3.5" />
           {error}
         </p>
       ) : null}

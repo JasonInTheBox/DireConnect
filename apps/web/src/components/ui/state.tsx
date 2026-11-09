@@ -60,8 +60,9 @@ export function ErrorState({
 
 export function FormError({ message }: { message: string }) {
   return (
-    <p role="alert" className="rounded-control border border-danger bg-danger-soft px-3 py-2 text-sm text-danger">
-      {message}
+    <p role="alert" className="flex gap-2 rounded-control border border-danger bg-danger-soft px-3 py-2 text-sm text-danger">
+      <Icon name="alert" className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>{message}</span>
     </p>
   );
 }

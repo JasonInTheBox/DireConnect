@@ -172,6 +172,30 @@ describe("customer routes", () => {
     );
   });
 
+  it("POST /businesses/:businessId/customer saves private notes, and an empty note as null", async () => {
+    mocks.businessFindUnique.mockResolvedValue({ id: "business-1", ownerId: "user-1" });
+    mocks.customerCreate.mockResolvedValue({ id: "customer-2" });
+
+    await request(createTestApp())
+      .post("/businesses/business-1/customer")
+      .send({ firstName: "Ada", notes: "Prefers rye" });
+    await request(createTestApp())
+      .post("/businesses/business-1/customer")
+      .send({ firstName: "Grace", notes: "" });
+
+    expect(mocks.customerCreate.mock.calls[0][0].data.notes).toBe("Prefers rye");
+    expect(mocks.customerCreate.mock.calls[1][0].data.notes).toBeNull();
+  });
+
+  it("POST /businesses/:businessId/customer rejects notes over 2,000 characters", async () => {
+    const response = await request(createTestApp())
+      .post("/businesses/business-1/customer")
+      .send({ firstName: "Ada", notes: "x".repeat(2001) });
+
+    expect(response.status).toBe(400);
+    expect(mocks.customerCreate).not.toHaveBeenCalled();
+  });
+
   it("POST /businesses/:businessId/customer rejects invalid customer data", async () => {
     const response = await request(createTestApp())
       .post("/businesses/business-1/customer")

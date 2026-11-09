@@ -14,11 +14,11 @@ import type { Customer } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { CheckboxField } from "@/components/ui/checkbox";
 import { Dialog } from "@/components/ui/dialog";
-import { TextField } from "@/components/ui/field";
+import { TextAreaField, TextField } from "@/components/ui/field";
 import { FormError } from "@/components/ui/state";
 import { useToast } from "@/components/ui/toast";
 
-const FIELDS = ["firstName", "lastName", "email", "phone"] as const;
+const FIELDS = ["firstName", "lastName", "email", "phone", "notes"] as const;
 
 type CustomerFormDialogProps = {
   open: boolean;
@@ -76,7 +76,7 @@ function CustomerForm({
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  function update(field: "firstName" | "lastName" | "email" | "phone") {
+  function update(field: "firstName" | "lastName" | "email" | "phone" | "notes") {
     return (event: { target: { value: string } }) =>
       setValues((previous) => ({ ...previous, [field]: event.target.value }));
   }
@@ -162,6 +162,14 @@ function CustomerForm({
         value={values.phone}
         onChange={update("phone")}
         error={errors.phone}
+      />
+      <TextAreaField
+        label="Notes"
+        hint="Only you see these, for example a favourite order or a birthday."
+        maxLength={2000}
+        value={values.notes}
+        onChange={update("notes")}
+        error={errors.notes}
       />
       <CheckboxField
         label="Customer explicitly agreed to receive promotional emails"

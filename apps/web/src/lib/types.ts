@@ -16,6 +16,7 @@ export type Customer = {
   lastName?: string | null;
   email?: string | null;
   phone?: string | null;
+  notes?: string | null;
   emailOptIn: boolean;
   smsOptIn: boolean;
   unsubscribedAt?: string | null;

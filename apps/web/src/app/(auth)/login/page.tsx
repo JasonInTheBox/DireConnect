@@ -7,7 +7,9 @@ import { AuthCard } from "@/components/auth/auth-card";
 import { Button } from "@/components/ui/button";
 import { TextField } from "@/components/ui/field";
 import { FormError } from "@/components/ui/state";
+import { authErrorMessage, isWrongPassword } from "@/lib/account";
 import { focusFirstInvalid } from "@/lib/forms";
+import { INVITE_MAILTO } from "@/lib/signupStatus";
 import { supabase } from "@/lib/supabase";
 import { useApiWarmup } from "@/lib/useApiWarmup";
 import { useSignupStatus } from "@/lib/useSignupStatus";
@@ -54,7 +56,11 @@ export default function LoginPage() {
 
     if (error) {
       setSubmitting(false);
-      setFormError(error.message);
+      setFormError(
+        isWrongPassword(error)
+          ? "That email and password don’t match an account. Check both and try again."
+          : authErrorMessage(error, "Could not log in. Try again."),
+      );
       return;
     }
 
@@ -64,10 +70,15 @@ export default function LoginPage() {
   return (
     <AuthCard
       title="Log in"
-      subtitle="Access your DireConnect business dashboard."
+      subtitle="Log in to your businesses and campaigns."
       footer={
         signupStatus === "closed" ? (
-          "New accounts aren’t being created right now."
+          <>
+            No account yet?{" "}
+            <a href={INVITE_MAILTO} className="font-medium text-accent underline underline-offset-4">
+              Ask for an invite
+            </a>
+          </>
         ) : signupStatus === "open" ? (
           <>
             Don’t have an account?{" "}

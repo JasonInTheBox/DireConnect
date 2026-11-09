@@ -72,7 +72,7 @@ export function createCustomerRouter(
         return res.status(400).json({ error: "Invalid business ID" });
       }
 
-      const { firstName, lastName, email, phone, emailOptIn, smsOptIn } =
+      const { firstName, lastName, email, phone, notes, emailOptIn, smsOptIn } =
         req.body;
 
       const business = await verifyBusinessOwnership(businessId, req.user!.id);
@@ -94,6 +94,7 @@ export function createCustomerRouter(
           lastName: lastName || null,
           email: email || null,
           phone: phone || null,
+          notes: notes || null,
           emailOptIn: nextEmailOptIn,
           smsOptIn: nextSmsOptIn,
           unsubscribedAt: isSubscribedToAnyChannel ? null : new Date(),
@@ -122,7 +123,7 @@ export function createCustomerRouter(
         return res.status(400).json({ error: "Invalid customer ID" });
       }
 
-      const { firstName, lastName, email, phone, emailOptIn, smsOptIn } =
+      const { firstName, lastName, email, phone, notes, emailOptIn, smsOptIn } =
         req.body;
 
       const business = await verifyBusinessOwnership(businessId, req.user!.id);
@@ -146,6 +147,7 @@ export function createCustomerRouter(
           lastName: lastName || null,
           email: email || null,
           phone: phone || null,
+          notes: notes || null,
           emailOptIn: nextEmailOptIn,
           smsOptIn: nextSmsOptIn,
           unsubscribedAt: isSubscribedToAnyChannel ? null : new Date(),

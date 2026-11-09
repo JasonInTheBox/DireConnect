@@ -6,10 +6,11 @@ import { useSession } from "@/components/shell/session-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TextField } from "@/components/ui/field";
-import { Icon } from "@/components/ui/icons";
+import { Icon, type IconName } from "@/components/ui/icons";
 import { PageContainer, PageHeader } from "@/components/ui/page-header";
 import { Panel } from "@/components/ui/panel";
 import { FormError } from "@/components/ui/state";
+import { setThemePreference, useThemePreference, type ThemePreference } from "@/components/ui/theme-toggle";
 import { useToast } from "@/components/ui/toast";
 import {
   authErrorMessage,
@@ -27,14 +28,60 @@ export default function AccountPage() {
       <PageHeader
         breadcrumbs={[{ label: "Account" }]}
         title="Account"
-        description="Your sign-in details and session."
+        description="How DireConnect looks, your sign-in details and your session."
       />
       <div className="max-w-2xl space-y-4">
+        <AppearancePanel />
         <SignInPanel />
         <PasswordPanel />
         <SessionPanel />
       </div>
     </PageContainer>
+  );
+}
+
+const THEME_CHOICES: Array<{ value: ThemePreference; label: string; hint: string; icon: IconName }> = [
+  { value: "system", label: "Match this device", hint: "Follows your computer or phone setting.", icon: "dashboard" },
+  { value: "light", label: "Light", hint: "Paper and navy ink.", icon: "sun" },
+  { value: "dark", label: "Dark", hint: "Navy paper, easier at night.", icon: "moon" },
+];
+
+/** Saved on this device; the theme toggle in the sidebar changes the same setting. */
+function AppearancePanel() {
+  const preference = useThemePreference();
+
+  return (
+    <Panel id="account-appearance-heading" title="Appearance">
+      <fieldset className="mt-4">
+        <legend className="text-sm text-muted">Theme, remembered on this device.</legend>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          {THEME_CHOICES.map((choice) => (
+            <label
+              key={choice.value}
+              className="flex cursor-pointer gap-3 rounded-control border border-line-strong p-3 transition-colors hover:bg-sunken has-[:checked]:border-accent has-[:checked]:bg-accent-soft"
+            >
+              <input
+                type="radio"
+                name="theme"
+                value={choice.value}
+                checked={preference === choice.value}
+                onChange={(event) => {
+                  const box = event.currentTarget.getBoundingClientRect();
+                  setThemePreference(choice.value, { x: box.left + box.width / 2, y: box.top + box.height / 2 });
+                }}
+                className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-accent"
+              />
+              <span>
+                <span className="flex items-center gap-1.5 text-sm font-medium text-ink">
+                  <Icon name={choice.icon} /> {choice.label}
+                </span>
+                <span className="mt-0.5 block text-xs text-muted">{choice.hint}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+    </Panel>
   );
 }
 

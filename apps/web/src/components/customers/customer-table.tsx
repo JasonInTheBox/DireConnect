@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icons";
-import { Menu } from "@/components/ui/menu";
 import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/table";
 import { emailConsentOf, fullName } from "@/lib/customers";
 import type { Customer } from "@/lib/types";
@@ -37,32 +36,21 @@ function ConsentBadges({ customer }: { customer: Customer }) {
   );
 }
 
+/** Edit and delete sit in every row, so neither is hidden behind a menu. */
 function RowActions({ customer, onEdit, onDelete }: { customer: Customer } & Handlers) {
   const name = fullName(customer);
+  const button =
+    "flex min-h-10 min-w-10 items-center justify-center rounded-control text-muted transition-colors hover:bg-sunken lg:min-h-9 lg:min-w-9";
 
   return (
-    <Menu
-      align="end"
-      items={[
-        { id: "edit", label: "Edit", icon: <Icon name="edit" />, onSelect: () => onEdit(customer) },
-        {
-          id: "delete",
-          label: "Delete",
-          icon: <Icon name="trash" />,
-          onSelect: () => onDelete(customer),
-        },
-      ]}
-      trigger={(triggerProps) => (
-        <button
-          {...triggerProps}
-          type="button"
-          aria-label={`Actions for ${name}`}
-          className="flex min-h-10 min-w-10 items-center justify-center rounded-control text-muted transition-colors hover:bg-sunken hover:text-ink lg:min-h-9 lg:min-w-9"
-        >
-          <Icon name="more" />
-        </button>
-      )}
-    />
+    <span className="inline-flex">
+      <button type="button" onClick={() => onEdit(customer)} aria-label={`Edit ${name}`} title="Edit" className={`${button} hover:text-ink`}>
+        <Icon name="edit" />
+      </button>
+      <button type="button" onClick={() => onDelete(customer)} aria-label={`Delete ${name}`} title="Delete" className={`${button} hover:text-danger`}>
+        <Icon name="trash" />
+      </button>
+    </span>
   );
 }
 
@@ -86,7 +74,7 @@ export function CustomerTable({
               <Th className="w-[34%]">Email</Th>
               <Th className="w-36">Phone</Th>
               <Th className="w-44">Consent</Th>
-              <Th className="w-[4.5rem]">
+              <Th className="w-24">
                 <span className="sr-only">Actions</span>
               </Th>
             </tr>
@@ -94,8 +82,15 @@ export function CustomerTable({
           <TBody>
             {customers.map((customer) => (
               <Tr key={customer.id}>
-                <Td className="overflow-hidden font-medium text-ink">
-                  <Truncated>{fullName(customer)}</Truncated>
+                <Td className="overflow-hidden">
+                  <Truncated>
+                    <span className="font-medium text-ink">{fullName(customer)}</span>
+                  </Truncated>
+                  {customer.notes ? (
+                    <p className="truncate text-xs text-muted" title={customer.notes}>
+                      {customer.notes}
+                    </p>
+                  ) : null}
                 </Td>
                 <Td className="overflow-hidden">
                   <Truncated>{customer.email || <Missing label="No email" />}</Truncated>
@@ -136,6 +131,12 @@ export function CustomerTable({
                 <dt className="sr-only">Phone</dt>
                 <dd className="truncate">{customer.phone || <Missing label="No phone" />}</dd>
               </div>
+              {customer.notes ? (
+                <div className="flex gap-2">
+                  <dt className="sr-only">Notes</dt>
+                  <dd className="line-clamp-2">{customer.notes}</dd>
+                </div>
+              ) : null}
             </dl>
           </li>
         ))}

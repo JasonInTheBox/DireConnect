@@ -163,8 +163,7 @@ test.describe("customers page", () => {
     const api = await mockApi(page, { businesses: [bakery], customers: { b1: [ada, grace] } });
     await page.goto("/businesses/b1/customers");
 
-    await page.getByRole("button", { name: "Actions for Grace Hopper" }).click();
-    await page.getByRole("menuitem", { name: "Edit" }).click();
+    await page.getByRole("button", { name: "Edit Grace Hopper" }).click();
 
     const dialog = page.getByRole("dialog", { name: "Edit customer" });
     await expect(dialog.getByLabel("First name")).toHaveValue("Grace");
@@ -189,8 +188,7 @@ test.describe("customers page", () => {
     await mockApi(page, { businesses: [bakery], customers: { b1: [ada, grace, alan] } });
     await page.goto("/businesses/b1/customers");
 
-    await page.getByRole("button", { name: "Actions for Alan Turing" }).click();
-    await page.getByRole("menuitem", { name: "Delete" }).click();
+    await page.getByRole("button", { name: "Delete Alan Turing" }).click();
 
     const dialog = page.getByRole("dialog", { name: "Delete Alan Turing?" });
     await dialog.getByRole("button", { name: "Delete customer" }).click();
@@ -208,8 +206,7 @@ test.describe("customers page", () => {
     });
     await page.goto("/businesses/b1/customers");
 
-    await page.getByRole("button", { name: "Actions for Alan Turing" }).click();
-    await page.getByRole("menuitem", { name: "Delete" }).click();
+    await page.getByRole("button", { name: "Delete Alan Turing" }).click();
 
     const dialog = page.getByRole("dialog", { name: "Delete Alan Turing?" });
     const confirm = dialog.getByRole("button", { name: "Delete customer" });
@@ -295,6 +292,6 @@ test.describe("customers page on a phone", () => {
     const card = page.getByRole("listitem").filter({ hasText: "Ada Lovelace" });
     await expect(card).toBeVisible();
     await expect(card).toContainText("Email opted in");
-    await expect(card.getByRole("button", { name: "Actions for Ada Lovelace" })).toBeVisible();
+    await expect(card.getByRole("button", { name: "Edit Ada Lovelace" })).toBeVisible();
   });
 });
