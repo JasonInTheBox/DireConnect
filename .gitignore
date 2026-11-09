@@ -19,8 +19,6 @@ build/
 *.js
 *.js.map
 *.d.ts
-!packages/*/dist/
-!apps/*/dist/
 .next/
 
 # Environment variables
