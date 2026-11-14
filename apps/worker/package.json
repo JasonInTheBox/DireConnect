@@ -16,7 +16,7 @@
   "devDependencies": {
     "@types/node": "^20.19.39",
     "prisma": "^7.7.0",
-    "tsx": "^4.22.2",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   },
   "dependencies": {
@@ -28,8 +28,8 @@
     "lodash.defaults": "^4.2.0",
     "lodash.isarguments": "^3.1.0",
     "lodash.isobject": "^3.0.2",
-    "msgpackr": "^2.0.2",
+    "msgpackr": "^2.1.4",
     "node-abort-controller": "^3.1.1",
-    "resend": "^6.32.1"
+    "resend": "^6.38.0"
   }
 }
